@@ -23,7 +23,7 @@ func TestConvert(t *testing.T) {
 		Skill: 10,
 	}
 
-	val, err := Convert[Left, Right](left)
+	val, err := ConvertFor[Left, Right](left)
 	if err != nil {
 		t.Error(err)
 		return

@@ -13,7 +13,7 @@ import (
 )
 
 type (
-	Converter                      func(src reflect.Value, target reflect.Value) error
+	Converter                      func(value reflect.Value, typ reflect.Type) (reflect.Value, error)
 	SimplifiedKind                 = reflect.Kind
 	LinkedMap[T comparable, R any] struct {
 		keys   []T
@@ -46,49 +46,6 @@ var (
 func init() {
 	mappers = make(map[SimplifiedKind]map[SimplifiedKind]Converter)
 	typeCache = make(map[reflect.Type]*Type)
-	mappers[KindInt] = map[SimplifiedKind]Converter{
-		KindInt:     sameType,
-		KindUint:    IntToUint,
-		KindFloat:   IntToFloat,
-		KindComplex: IntToComplex,
-		KindString:  IntToString,
-		KindBool:    IntToBool,
-	}
-	mappers[KindUint] = map[SimplifiedKind]Converter{
-		KindUint:    sameType,
-		KindInt:     UintToInt,
-		KindFloat:   UintToFloat,
-		KindComplex: UintToComplex,
-		KindString:  UintToString,
-		KindBool:    UintToBool,
-	}
-	mappers[KindFloat] = map[SimplifiedKind]Converter{
-		KindFloat:   sameType,
-		KindUint:    FloatToUint,
-		KindInt:     FloatToInt,
-		KindComplex: FloatToComplex,
-		KindString:  FloatToString,
-	}
-	mappers[KindComplex] = map[SimplifiedKind]Converter{
-		KindComplex: sameType,
-		KindUint:    ComplexToUint,
-		KindInt:     ComplexToInt,
-		KindFloat:   ComplexToFloat,
-		KindString:  ComplexToString,
-	}
-	mappers[KindString] = map[SimplifiedKind]Converter{
-		KindString:  sameType,
-		KindUint:    StringToUint,
-		KindInt:     StringToInt,
-		KindFloat:   StringToFloat,
-		KindComplex: StringToComplex,
-		KindBool:    StringToBool,
-	}
-	mappers[reflect.Struct] = map[SimplifiedKind]Converter{
-		reflect.Struct: func(src, target reflect.Value) error {
-			return nil
-		},
-	}
 }
 
 func (x *LinkedMap[T, R]) Set(key T, value R) {
@@ -168,18 +125,8 @@ func SimplifyKind(kind reflect.Kind) SimplifiedKind {
 	}
 }
 
-func sameType(src reflect.Value, target reflect.Value) (err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
-		}
-	}()
-	target.Set(src)
-	return nil
-}
-
-func Analyze[T any]() (*Type, error) {
-	n, typ := DeReferenceType(reflect.TypeFor[T]())
+func Analyze(t reflect.Type) (*Type, error) {
+	n, typ := DeReferenceType(t)
 	mut.RLocker()
 	if value, ok := typeCache[typ]; ok {
 		mut.RUnlock()
@@ -215,7 +162,21 @@ func Analyze[T any]() (*Type, error) {
 	return val, nil
 }
 
-func FastConvert[T any, R any](in *T) (r *R, err error) {
+func AnalyzeFor[T any]() (*Type, error) {
+	return Analyze(reflect.TypeFor[T]())
+}
+
+func FastConvert(in reflect.Value, o reflect.Type) (out reflect.Value, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+
+	return reflect.NewAt(o, in.UnsafePointer()), nil
+}
+
+func FastConvertFor[T any, R any](in *T) (r *R, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
@@ -224,17 +185,19 @@ func FastConvert[T any, R any](in *T) (r *R, err error) {
 	return (*R)(unsafe.Pointer(in)), nil
 }
 
-func Convert[T any, R any](in *T) (*R, error) {
-	lt, err := Analyze[T]()
+func Convert(in reflect.Value, out reflect.Type) (reflect.Value, error) {
+	var zero reflect.Value
+
+	lt, err := Analyze(in.Type())
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
-	rt, err := Analyze[R]()
+	rt, err := Analyze(out)
 	if err != nil {
-		return nil, err
+		return zero, err
 	}
 	if lt.hash == rt.hash {
-		return FastConvert[T, R](in)
+		return FastConvert(in, out)
 	}
 
 	_, lv := DeReference(reflect.ValueOf(in))
@@ -253,6 +216,11 @@ func Convert[T any, R any](in *T) (*R, error) {
 			continue
 		}
 
+		if field.Type.ConvertibleTo(targetType.Type) {
+			rv.FieldByIndex(targetType.Index).Set(srcValue.Convert(targetType.Type))
+			continue
+		}
+
 		_, realSourceType := DeReferenceType(field.Type)
 		n, realTargetType := DeReferenceType(targetType.Type)
 
@@ -263,22 +231,37 @@ func Convert[T any, R any](in *T) (*R, error) {
 			continue
 		}
 
+		if realSourceType.ConvertibleTo(realTargetType) {
+			rv.FieldByIndex(targetType.Index).Set(Reference(n, realSourceValue.Convert(realTargetType)))
+			continue
+		}
+
 		conv, ok := mappers[SimplifyKind(realSourceType.Kind())]
 		if !ok {
-			return nil, fmt.Errorf("no converters found for %s to %s", realSourceType.Kind(), realTargetType.Kind())
+			return zero, fmt.Errorf("no converters found for %s to %s", realSourceType.Kind(), realTargetType.Kind())
 		}
 		fn, ok := conv[SimplifiedKind(realTargetType.Kind())]
 		if !ok {
-			return nil, fmt.Errorf("no converters found for %s to %s", realSourceType.Kind(), realTargetType.Kind())
+			return zero, fmt.Errorf("no converters found for %s to %s", realSourceType.Kind(), realTargetType.Kind())
 		}
-		value := reflect.New(realTargetType).Elem()
-		fn(realSourceValue, value)
+		//value := reflect.New(realTargetType).Elem()
+		value, err := fn(realSourceValue, realTargetType)
+		if err != nil {
+			return zero, err
+		}
 		rv.FieldByIndex(targetType.Index).Set(Reference(n, value))
 	}
 	ref := Reference(rt.refCount, rv)
 
-	return ref.Addr().Interface().(*R), nil
+	return ref.Addr(), nil
+}
 
+func ConvertFor[T any, R any](in *T) (*R, error) {
+	out, err := Convert(reflect.ValueOf(in), reflect.TypeFor[R]())
+	if err != nil {
+		return nil, err
+	}
+	return out.Interface().(*R), nil
 }
 
 func DeReferenceType(v reflect.Type) (int, reflect.Type) {
@@ -312,43 +295,6 @@ func Reference(n int, v reflect.Value) reflect.Value {
 	}
 
 	return ref
-}
-
-func Map[T any, R any](in T) (R, error) {
-	tValue := reflect.ValueOf(in)
-	tType := tValue.Type()
-	zero := Zero[R]()
-
-	if tType.Kind() != reflect.Struct {
-		return Zero[R](), fmt.Errorf("unsupported type")
-	}
-
-	rValue := reflect.ValueOf(zero)
-	rType := rValue.Type()
-
-	for tField, tValue := range tValue.Fields() {
-		name := TargetFieldName(tField)
-		rField, ok := rType.FieldByName(name)
-		if !ok {
-			continue
-		}
-		if !rField.IsExported() {
-			continue
-		}
-		left, ok := mappers[tField.Type.Kind()]
-		if !ok {
-			return zero, fmt.Errorf("")
-		}
-		right, ok := left[rField.Type.Kind()]
-		if !ok {
-			return zero, fmt.Errorf("")
-		}
-		if err := right(tValue, rValue.FieldByIndex(rField.Index)); err != nil {
-			return zero, err
-		}
-	}
-
-	return rValue.Interface().(R), nil
 }
 
 func TargetFieldName(field reflect.StructField) string {
