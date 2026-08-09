@@ -14,7 +14,6 @@ import (
 
 type (
 	Converter                      func(value reflect.Value, typ reflect.Type) (reflect.Value, error)
-	SimplifiedKind                 = reflect.Kind
 	LinkedMap[T comparable, R any] struct {
 		keys   []T
 		values map[T]R
@@ -28,23 +27,12 @@ type (
 	}
 )
 
-const (
-	KindInt     SimplifiedKind = reflect.Int
-	KindUint    SimplifiedKind = reflect.Uint
-	KindFloat   SimplifiedKind = reflect.Float64
-	KindComplex SimplifiedKind = reflect.Complex128
-	KindString  SimplifiedKind = reflect.String
-	KindBool    SimplifiedKind = reflect.Bool
-)
-
 var (
-	mappers   map[SimplifiedKind]map[SimplifiedKind]Converter
 	typeCache map[reflect.Type]*Type
 	mut       sync.RWMutex
 )
 
 func init() {
-	mappers = make(map[SimplifiedKind]map[SimplifiedKind]Converter)
 	typeCache = make(map[reflect.Type]*Type)
 }
 
@@ -97,31 +85,6 @@ func NewType(id string, typ reflect.Type, refCount int, size uint, hash string) 
 		refCount: refCount,
 		size:     size,
 		hash:     hash,
-	}
-}
-
-func SimplifyKind(kind reflect.Kind) SimplifiedKind {
-	switch kind {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		{
-			return KindInt
-		}
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		{
-			return KindUint
-		}
-	case reflect.Float32, reflect.Float64:
-		{
-			return KindFloat
-		}
-	case reflect.Complex64, reflect.Complex128:
-		{
-			return KindComplex
-		}
-	default:
-		{
-			return kind
-		}
 	}
 }
 
@@ -236,20 +199,20 @@ func Convert(in reflect.Value, out reflect.Type) (reflect.Value, error) {
 			continue
 		}
 
-		conv, ok := mappers[SimplifyKind(realSourceType.Kind())]
-		if !ok {
-			return zero, fmt.Errorf("no converters found for %s to %s", realSourceType.Kind(), realTargetType.Kind())
-		}
-		fn, ok := conv[SimplifiedKind(realTargetType.Kind())]
-		if !ok {
-			return zero, fmt.Errorf("no converters found for %s to %s", realSourceType.Kind(), realTargetType.Kind())
-		}
-		//value := reflect.New(realTargetType).Elem()
-		value, err := fn(realSourceValue, realTargetType)
-		if err != nil {
-			return zero, err
-		}
-		rv.FieldByIndex(targetType.Index).Set(Reference(n, value))
+		// conv, ok := mappers[SimplifyKind(realSourceType.Kind())]
+		// if !ok {
+		// 	return zero, fmt.Errorf("no converters found for %s to %s", realSourceType.Kind(), realTargetType.Kind())
+		// }
+		// fn, ok := conv[SimplifiedKind(realTargetType.Kind())]
+		// if !ok {
+		// 	return zero, fmt.Errorf("no converters found for %s to %s", realSourceType.Kind(), realTargetType.Kind())
+		// }
+		// //value := reflect.New(realTargetType).Elem()
+		// value, err := fn(realSourceValue, realTargetType)
+		// if err != nil {
+		// 	return zero, err
+		// }
+		// rv.FieldByIndex(targetType.Index).Set(Reference(n, value))
 	}
 	ref := Reference(rt.refCount, rv)
 
