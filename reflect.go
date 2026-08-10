@@ -84,14 +84,6 @@ func Analyze(t reflect.Type) (*Type, error) {
 		l = binary.PutUvarint(buf, uint64(fieldType.Kind()))
 		signature.Write(buf[:l])
 		signature.WriteByte(0)
-		if fieldType.Kind() == reflect.Struct {
-			typ, err := Analyze(field.Type)
-			if err != nil {
-				return nil, err
-			}
-			signature.Write([]byte(typ.hash))
-			continue
-		}
 	}
 	sha256 := sha256.New()
 	if _, err := sha256.Write(signature.Bytes()); err != nil {

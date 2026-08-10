@@ -10,9 +10,11 @@ import (
 type (
 	Shared struct {
 		Value int
+		Test  []int
 	}
 	Shared2 struct {
 		Value string
+		Test  []int32
 	}
 	Left struct {
 		Name   string
@@ -33,7 +35,7 @@ func TestConvert(t *testing.T) {
 	left := &Left{
 		Name:   "Pouya",
 		Skill:  10,
-		Shared: Shared{1},
+		Shared: Shared{1, []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}},
 		Time:   time.Now(),
 	}
 
