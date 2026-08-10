@@ -12,6 +12,7 @@ import (
 
 type (
 	Converter func(value reflect.Value, typ reflect.Type) (reflect.Value, error)
+	Pipeline  func(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error)
 	Type      struct {
 		id       string
 		typ      reflect.Type
@@ -23,6 +24,7 @@ type (
 
 var (
 	converters map[reflect.Type]map[reflect.Type]Converter
+	pipeline   []Pipeline
 	typeCache  map[reflect.Type]*Type
 	mut        sync.RWMutex
 )
@@ -30,6 +32,12 @@ var (
 func init() {
 	converters = make(map[reflect.Type]map[reflect.Type]Converter)
 	typeCache = make(map[reflect.Type]*Type)
+	pipeline = []Pipeline{
+		TryAssign,
+		TryConvert,
+		TryChangeType,
+		TryCustomConvert,
+	}
 }
 
 func NewType(id string, typ reflect.Type, refCount int, size uint, hash string) *Type {
@@ -89,20 +97,20 @@ func FastConvert(in reflect.Value, o reflect.Type) (out reflect.Value, err error
 	return reflect.NewAt(o, in.UnsafePointer()), nil
 }
 
-func TryAssign(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) bool {
+func TryAssign(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error) {
 	if !sourceField.Type.AssignableTo(targetField.Type) {
-		return false
+		return false, nil
 	}
 	targetValue.FieldByIndex(targetField.Index).Set(Reference(n, sourceValue))
-	return true
+	return true, nil
 }
 
-func TryConvert(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) bool {
+func TryConvert(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error) {
 	if !sourceField.Type.ConvertibleTo(targetField.Type) {
-		return false
+		return false, nil
 	}
 	targetValue.FieldByIndex(targetField.Index).Set(Reference(n, sourceValue.Convert(targetField.Type)))
-	return true
+	return true, nil
 }
 
 func TryDereference(sourceField *reflect.StructField, targetField *reflect.StructField, sourceValue *reflect.Value) int {
@@ -116,29 +124,29 @@ func TryDereference(sourceField *reflect.StructField, targetField *reflect.Struc
 	return n
 }
 
-func TryChangeType(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) bool {
+func TryChangeType(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error) {
 	if sourceField.Type.Kind() != targetField.Type.Kind() {
-		return false
+		return false, nil
 	}
 	val, err := Convert(sourceValue, targetValue.Type())
 	if err != nil {
-		return false
+		return false, nil
 	}
 	targetValue.FieldByIndex(targetField.Index).Set(Reference(n, val.Elem()))
-	return true
+	return true, nil
 }
 
-func TryCustomConvert(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) bool {
+func TryCustomConvert(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error) {
 	conv, ok := FindConverter(sourceField.Type, targetField.Type)
 	if !ok {
-		return false
+		return false, nil
 	}
 	val, err := conv(sourceValue, targetValue.Type())
 	if err != nil {
-		return false
+		return false, err
 	}
 	targetValue.FieldByIndex(targetField.Index).Set(Reference(n, val))
-	return true
+	return true, nil
 }
 
 func SlowConvert(sourceType *Type, targetType *Type, source reflect.Value) (reflect.Value, error) {
@@ -158,20 +166,16 @@ func SlowConvert(sourceType *Type, targetType *Type, source reflect.Value) (refl
 		}
 
 		n := 0
+	LOOP:
 		for range 2 {
-			if TryAssign(sourceField, targetField, sourceValue, targetValue, n) {
-				break
-			}
-			if TryConvert(sourceField, targetField, sourceValue, targetValue, n) {
-				break
-			}
-
-			if TryChangeType(sourceField, targetField, sourceValue, targetValue, n) {
-				break
-			}
-
-			if TryCustomConvert(sourceField, targetField, sourceValue, targetValue, n) {
-				break
+			for _, p := range pipeline {
+				ok, err := p(sourceField, targetField, sourceValue, targetValue, n)
+				if err != nil {
+					return Zero[reflect.Value](), err
+				}
+				if ok {
+					break LOOP
+				}
 			}
 
 			if n = TryDereference(&sourceField, &targetField, &sourceValue); n == 0 {
