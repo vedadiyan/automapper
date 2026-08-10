@@ -25,7 +25,7 @@ type (
 		Name   string
 		Skill  int
 		Shared Shared2
-		Time   string
+		Time   **string
 	}
 )
 
