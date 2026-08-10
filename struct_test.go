@@ -12,7 +12,7 @@ type (
 		Value int
 	}
 	Shared2 struct {
-		Value int
+		Value string
 	}
 	Left struct {
 		Name   string
@@ -41,6 +41,11 @@ func TestConvert(t *testing.T) {
 	converters[reflect.TypeFor[time.Time]()] = map[reflect.Type]Converter{
 		strType: func(value reflect.Value, typ reflect.Type) (reflect.Value, error) {
 			return reflect.ValueOf(fmt.Sprintf("%s", value.Interface())), nil
+		},
+	}
+	converters[reflect.TypeFor[int]()] = map[reflect.Type]Converter{
+		strType: func(value reflect.Value, typ reflect.Type) (reflect.Value, error) {
+			return reflect.ValueOf(fmt.Sprintf("%d", value.Interface())), nil
 		},
 	}
 

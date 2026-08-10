@@ -128,7 +128,7 @@ func TryChangeType(sourceField reflect.StructField, targetField reflect.StructFi
 	if sourceField.Type.Kind() != targetField.Type.Kind() {
 		return false, nil
 	}
-	val, err := Convert(sourceValue, targetValue.Type())
+	val, err := Convert(sourceValue, targetField.Type)
 	if err != nil {
 		return false, nil
 	}
