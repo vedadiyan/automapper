@@ -12,7 +12,7 @@ import (
 
 type (
 	Converter func(value reflect.Value, typ reflect.Type) (reflect.Value, error)
-	Pipeline  func(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error)
+	Pipeline  func(sourceFiel, targetField reflect.StructField, sourceValue, targetValue reflect.Value, n int) (bool, error)
 	Type      struct {
 		id       string
 		typ      reflect.Type
@@ -33,10 +33,10 @@ func init() {
 	converters = make(map[reflect.Type]map[reflect.Type]Converter)
 	typeCache = make(map[reflect.Type]*Type)
 	pipeline = []Pipeline{
+		TryCustomConvert,
 		TryAssign,
 		TryConvert,
 		TryChangeType,
-		TryCustomConvert,
 	}
 }
 
