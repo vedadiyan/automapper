@@ -66,16 +66,32 @@ func Analyze(t reflect.Type) (*Type, error) {
 	}
 	id := fmt.Sprintf("%s.%s", typ.PkgPath(), typ.Name())
 	signature := bytes.NewBuffer(nil)
+	buf := make([]byte, binary.MaxVarintLen64)
 	for field := range typ.Fields() {
-		n, typ := DeReferenceType(field.Type)
-		bytes := make([]byte, 8)
-		binary.PutUvarint(bytes, uint64(field.Type.Size()))
-		signature.WriteByte(byte(n))
-		signature.WriteString("\r\n")
-		signature.WriteByte(byte(typ.Kind()))
-		signature.WriteString("\r\n")
-		signature.Write(bytes)
-		signature.WriteString("\r\n")
+		dn, fieldType := DeReferenceType(field.Type)
+		l := binary.PutUvarint(buf, uint64(dn))
+		signature.Write(buf[:l])
+		signature.WriteByte(0)
+		l = binary.PutUvarint(buf, uint64(field.Offset))
+		signature.Write(buf[:l])
+		signature.WriteByte(0)
+		l = binary.PutUvarint(buf, uint64(fieldType.Align()))
+		signature.Write(buf[:l])
+		signature.WriteByte(0)
+		l = binary.PutUvarint(buf, uint64(fieldType.Size()))
+		signature.Write(buf[:l])
+		signature.WriteByte(0)
+		l = binary.PutUvarint(buf, uint64(fieldType.Kind()))
+		signature.Write(buf[:l])
+		signature.WriteByte(0)
+		if fieldType.Kind() == reflect.Struct {
+			typ, err := Analyze(field.Type)
+			if err != nil {
+				return nil, err
+			}
+			signature.Write([]byte(typ.hash))
+			continue
+		}
 	}
 	sha256 := sha256.New()
 	if _, err := sha256.Write(signature.Bytes()); err != nil {
