@@ -36,7 +36,7 @@ func init() {
 		TryCustomConvert,
 		TryAssign,
 		TryConvert,
-		TryChangeType,
+		TryChangeStructType,
 	}
 }
 
@@ -67,6 +67,7 @@ func Analyze(t reflect.Type) (*Type, error) {
 	id := fmt.Sprintf("%s.%s", typ.PkgPath(), typ.Name())
 	signature := bytes.NewBuffer(nil)
 	buf := make([]byte, binary.MaxVarintLen64)
+
 	for field := range typ.Fields() {
 		dn, fieldType := DeReferenceType(field.Type)
 		l := binary.PutUvarint(buf, uint64(dn))
@@ -132,8 +133,8 @@ func TryDereference(sourceField *reflect.StructField, targetField *reflect.Struc
 	return n
 }
 
-func TryChangeType(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error) {
-	if sourceField.Type.Kind() != targetField.Type.Kind() {
+func TryChangeStructType(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error) {
+	if sourceField.Type.Kind() != reflect.Struct || targetField.Type.Kind() != reflect.Struct {
 		return false, nil
 	}
 	val, err := Convert(sourceValue, targetField.Type)
