@@ -28,11 +28,13 @@ type (
 )
 
 var (
-	typeCache map[reflect.Type]*Type
-	mut       sync.RWMutex
+	converters map[reflect.Type]map[reflect.Type]Converter
+	typeCache  map[reflect.Type]*Type
+	mut        sync.RWMutex
 )
 
 func init() {
+	converters = make(map[reflect.Type]map[reflect.Type]Converter)
 	typeCache = make(map[reflect.Type]*Type)
 }
 
@@ -98,7 +100,6 @@ func Analyze(t reflect.Type) (*Type, error) {
 
 	mut.Lock()
 	defer mut.Unlock()
-	// Double read to block duplicate calls
 	if value, ok := typeCache[typ]; ok {
 		return value, nil
 	}
@@ -163,10 +164,14 @@ func Convert(in reflect.Value, out reflect.Type) (reflect.Value, error) {
 		return FastConvert(in, out)
 	}
 
-	_, lv := DeReference(reflect.ValueOf(in))
+	_, lv := DeReference(in)
 	rv := reflect.New(rt.typ).Elem()
 
 	for field := range lt.typ.Fields() {
+		if !field.IsExported() {
+			continue
+		}
+
 		srcValue := lv.FieldByIndex(field.Index)
 
 		targetType, ok := rt.typ.FieldByName(field.Name)
@@ -199,20 +204,23 @@ func Convert(in reflect.Value, out reflect.Type) (reflect.Value, error) {
 			continue
 		}
 
-		// conv, ok := mappers[SimplifyKind(realSourceType.Kind())]
-		// if !ok {
-		// 	return zero, fmt.Errorf("no converters found for %s to %s", realSourceType.Kind(), realTargetType.Kind())
-		// }
-		// fn, ok := conv[SimplifiedKind(realTargetType.Kind())]
-		// if !ok {
-		// 	return zero, fmt.Errorf("no converters found for %s to %s", realSourceType.Kind(), realTargetType.Kind())
-		// }
-		// //value := reflect.New(realTargetType).Elem()
-		// value, err := fn(realSourceValue, realTargetType)
-		// if err != nil {
-		// 	return zero, err
-		// }
-		// rv.FieldByIndex(targetType.Index).Set(Reference(n, value))
+		if realSourceType.Kind() == realTargetType.Kind() {
+			val, err := Convert(realSourceValue, realTargetType)
+			if err != nil {
+				return zero, err
+			}
+			rv.FieldByIndex(targetType.Index).Set(Reference(n, val.Elem()))
+		}
+
+		conv, ok := getConverter(realSourceType, realTargetType)
+		if !ok {
+			return zero, fmt.Errorf("no conversion possible between %s and %s", realSourceType.Name(), realTargetType.Name())
+		}
+		val, err := conv(realSourceValue, realTargetType)
+		if err != nil {
+			return zero, err
+		}
+		rv.FieldByIndex(targetType.Index).Set(Reference(n, val))
 	}
 	ref := Reference(rt.refCount, rv)
 
@@ -225,6 +233,18 @@ func ConvertFor[T any, R any](in *T) (*R, error) {
 		return nil, err
 	}
 	return out.Interface().(*R), nil
+}
+
+func getConverter(l reflect.Type, r reflect.Type) (Converter, bool) {
+	lVal, ok := converters[l]
+	if !ok {
+		return nil, false
+	}
+	rVal, ok := lVal[r]
+	if !ok {
+		return nil, false
+	}
+	return rVal, true
 }
 
 func DeReferenceType(v reflect.Type) (int, reflect.Type) {
