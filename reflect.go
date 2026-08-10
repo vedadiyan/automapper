@@ -37,6 +37,7 @@ func init() {
 		TryAssign,
 		TryConvert,
 		TryChangeStructType,
+		TryChangeArrayType,
 	}
 }
 
@@ -142,6 +143,14 @@ func TryChangeStructType(sourceField reflect.StructField, targetField reflect.St
 		return false, nil
 	}
 	targetValue.FieldByIndex(targetField.Index).Set(Reference(n, val.Elem()))
+	return true, nil
+}
+
+func TryChangeArrayType(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error) {
+	if (sourceField.Type.Kind() != reflect.Slice && sourceField.Type.Kind() != reflect.Array) || (targetField.Type.Kind() != reflect.Slice && targetField.Type.Kind() != reflect.Array) {
+		return false, nil
+	}
+
 	return true, nil
 }
 
