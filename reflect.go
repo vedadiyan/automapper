@@ -165,20 +165,13 @@ func SlowConvert(sourceType *Type, targetType *Type, source reflect.Value) (refl
 			continue
 		}
 
-		n := 0
-	LOOP:
-		for range 2 {
-			for _, p := range pipeline {
-				ok, err := p(sourceField, targetField, sourceValue, targetValue, n)
-				if err != nil {
-					return Zero[reflect.Value](), err
-				}
-				if ok {
-					break LOOP
-				}
+		n := TryDereference(&sourceField, &targetField, &sourceValue)
+		for _, p := range pipeline {
+			ok, err := p(sourceField, targetField, sourceValue, targetValue, n)
+			if err != nil {
+				return Zero[reflect.Value](), err
 			}
-
-			if n = TryDereference(&sourceField, &targetField, &sourceValue); n == 0 {
+			if ok {
 				break
 			}
 		}
