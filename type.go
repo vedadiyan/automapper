@@ -86,6 +86,10 @@ var (
 	mutx  sync.RWMutex
 )
 
+func init() {
+	types = make(map[reflect.Type]Type)
+}
+
 func newStructField(t *reflect.StructField) *StructField {
 	return &StructField{
 		Name:      t.Name,
@@ -93,6 +97,7 @@ func newStructField(t *reflect.StructField) *StructField {
 		Offset:    t.Offset,
 		Index:     t.Index,
 		Anonymous: t.Anonymous,
+		Type : 	   typeOf(t.Type),
 	}
 }
 
@@ -354,7 +359,7 @@ func (rt *rtype) Signature() string {
 		case reflect.Map:
 			{
 				signature := bytes.NewBuffer(nil)
-				signature.WriteByte(byte(reflect.Array))
+				signature.WriteByte(byte(reflect.Map))
 				signature.WriteByte(0x0)
 
 				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
@@ -383,7 +388,7 @@ func (rt *rtype) Signature() string {
 					signature.WriteByte(0x0)
 
 					for _, i := range f.Index {
-						n = binary.PutUvarint(buf, uint64(f.Index[i]))
+						n = binary.PutUvarint(buf, uint64(i))
 						signature.Write(buf[:n])
 						signature.WriteByte(0x0)
 					}
@@ -412,9 +417,9 @@ func (rt *rtype) Signature() string {
 }
 
 func (rt *rtype) PointerCount() int {
-	return 0
+	return rt.ptrCount
 }
 
 func (rt *rtype) ConcreteType() Type {
-	return rt
+	return rt.ct
 }
