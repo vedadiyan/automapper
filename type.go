@@ -101,14 +101,6 @@ func newStructField(t *reflect.StructField) *StructField {
 	}
 }
 
-func deRefType(t reflect.Type) (int, Type) {
-	n, ct := DeReferenceType(t)
-	out := &rtype{}
-	out.t = ct
-	out.ct = out
-	return n, out
-}
-
 func typeOf(t reflect.Type) Type {
 	mutx.RLock()
 	if val, ok := types[t]; ok {
@@ -117,11 +109,15 @@ func typeOf(t reflect.Type) Type {
 	}
 	mutx.RUnlock()
 
-	n, ct := deRefType(t)
+	n, ct := DeReferenceType(t)
 	out := &rtype{
 		t:        t,
-		ct:       ct,
 		ptrCount: n,
+	}
+	if n != 0 {
+		out.ct = typeOf(ct)
+	} else {
+		out.ct = out
 	}
 
 	mutx.Lock()
