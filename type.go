@@ -101,7 +101,7 @@ func newStructField(t *reflect.StructField) *StructField {
 	}
 }
 
-func derefType(t reflect.Type) (int, Type) {
+func deRefType(t reflect.Type) (int, Type) {
 	n, ct := DeReferenceType(t)
 	out := &rtype{}
 	out.t = ct
@@ -117,7 +117,7 @@ func typeOf(t reflect.Type) Type {
 	}
 	mutx.RUnlock()
 
-	n, ct := derefType(t)
+	n, ct := deRefType(t)
 	out := &rtype{
 		t:        t,
 		ct:       ct,
@@ -375,7 +375,6 @@ func (rt *rtype) Signature() string {
 				n := binary.PutUvarint(buf, uint64(rt.ConcreteType().Len()))
 				signature.Write(buf[:n])
 				signature.WriteByte(0x0)
-
 
 				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
 				signature.WriteByte(0x0)
