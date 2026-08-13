@@ -355,6 +355,9 @@ func (rt *rtype) Signature() string {
 				signature.WriteByte(byte(reflect.Array))
 				signature.WriteByte(0x0)
 
+				signature.WriteByte(byte(rt.ConcreteType().Len()))
+				signature.WriteByte(0x0)
+
 				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
 				signature.WriteByte(0x0)
 
