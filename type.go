@@ -349,7 +349,22 @@ func (rt *rtype) Signature() string {
 			return
 		}
 		switch rt.ConcreteType().Kind() {
-		case reflect.Array, reflect.Slice:
+		case reflect.Slice:
+			{
+				signature := bytes.NewBuffer(nil)
+				signature.WriteByte(byte(reflect.Array))
+				signature.WriteByte(0x0)
+
+				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
+				signature.WriteByte(0x0)
+
+				signature.WriteString(rt.ConcreteType().Elem().ConcreteType().Signature())
+				signature.WriteByte(0x0)
+
+				sha256 := sha256.Sum256(signature.Bytes())
+				rt.signature = hex.EncodeToString(sha256[:])
+			}
+		case reflect.Array:
 			{
 				signature := bytes.NewBuffer(nil)
 				signature.WriteByte(byte(reflect.Array))
