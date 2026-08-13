@@ -32,6 +32,10 @@ type (
 )
 
 func TestConvert(t *testing.T) {
+
+	n := reflect.TypeOf(nil)
+
+	_ = n
 	left := &Left{
 		Name:   "Pouya",
 		Skill:  10,

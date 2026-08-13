@@ -90,8 +90,12 @@ func init() {
 	types = make(map[reflect.Type]Type)
 }
 
-func newStructField(t *reflect.StructField) *StructField {
-	return &StructField{
+func newStructField(t *reflect.StructField) StructField {
+	if t == nil {
+		return StructField{}
+	}
+
+	return StructField{
 		Name:      t.Name,
 		PkgPath:   t.PkgPath,
 		Offset:    t.Offset,
@@ -102,6 +106,10 @@ func newStructField(t *reflect.StructField) *StructField {
 }
 
 func typeOf(t reflect.Type) Type {
+	if t == nil {
+		return nil
+	}
+
 	mutx.RLock()
 	if val, ok := types[t]; ok {
 		mutx.RUnlock()
@@ -227,14 +235,14 @@ func (rt *rtype) Elem() Type {
 
 func (rt *rtype) Field(i int) StructField {
 	in := rt.t.Field(i)
-	return *newStructField(&in)
+	return newStructField(&in)
 }
 
 func (rt *rtype) Fields() iter.Seq[StructField] {
 	return func(yield func(StructField) bool) {
 		for i := 0; i < rt.t.NumField(); i++ {
 			in := rt.t.Field(i)
-			if !yield(*newStructField(&in)) {
+			if !yield(newStructField(&in)) {
 				return
 			}
 		}
@@ -243,17 +251,17 @@ func (rt *rtype) Fields() iter.Seq[StructField] {
 
 func (rt *rtype) FieldByIndex(index []int) StructField {
 	in := rt.t.FieldByIndex(index)
-	return *newStructField(&in)
+	return newStructField(&in)
 }
 
 func (rt *rtype) FieldByName(name string) (StructField, bool) {
 	out, ok := rt.t.FieldByName(name)
-	return *newStructField(&out), ok
+	return newStructField(&out), ok
 }
 
 func (rt *rtype) FieldByNameFunc(match func(string) bool) (StructField, bool) {
 	out, ok := rt.t.FieldByNameFunc(match)
-	return *newStructField(&out), ok
+	return newStructField(&out), ok
 }
 
 func (rt *rtype) In(i int) Type {
@@ -329,7 +337,10 @@ func (rt *rtype) CanSeq2() bool {
 }
 
 func (rt *rtype) IdenticalTo(t Type) bool {
-	return rt.Signature() == t.Signature() && rt.PointerCount() == t.PointerCount()
+	if t == nil {
+		return false
+	}
+	return rt.Signature() == t.Signature()
 }
 
 func (rt *rtype) Signature() string {
@@ -341,6 +352,14 @@ func (rt *rtype) Signature() string {
 		signature.WriteByte(0x0)
 		if rt.ConcreteType().Comparable() {
 			signature.WriteByte(byte(rt.ConcreteType().Kind()))
+			signature.WriteByte(0x0)
+
+			n := binary.PutUvarint(buf, uint64(rt.ConcreteType().Align()))
+			signature.Write(buf[:n])
+			signature.WriteByte(0x0)
+
+			n = binary.PutUvarint(buf, uint64(rt.ConcreteType().Size()))
+			signature.Write(buf[:n])
 			signature.WriteByte(0x0)
 
 			signature.WriteByte(byte(rt.ConcreteType().PointerCount()))
@@ -389,6 +408,9 @@ func (rt *rtype) Signature() string {
 			{
 				signature := bytes.NewBuffer(nil)
 				signature.WriteByte(byte(reflect.Map))
+				signature.WriteByte(0x0)
+
+				signature.WriteByte(byte(rt.ConcreteType().Key().PointerCount()))
 				signature.WriteByte(0x0)
 
 				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
