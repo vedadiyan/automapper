@@ -335,6 +335,8 @@ func (rt *rtype) IdenticalTo(t Type) bool {
 func (rt *rtype) Signature() string {
 	rt.once.Do(func() {
 		signature := bytes.NewBuffer(nil)
+		buf := make([]byte, binary.MaxVarintLen64)
+
 		signature.WriteByte(byte(rt.PointerCount()))
 		signature.WriteByte(0x0)
 		if rt.ConcreteType().Comparable() {
@@ -352,7 +354,7 @@ func (rt *rtype) Signature() string {
 		case reflect.Slice:
 			{
 				signature := bytes.NewBuffer(nil)
-				signature.WriteByte(byte(reflect.Array))
+				signature.WriteByte(byte(reflect.Slice))
 				signature.WriteByte(0x0)
 
 				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
@@ -370,8 +372,10 @@ func (rt *rtype) Signature() string {
 				signature.WriteByte(byte(reflect.Array))
 				signature.WriteByte(0x0)
 
-				signature.WriteByte(byte(rt.ConcreteType().Len()))
+				n := binary.PutUvarint(buf, uint64(rt.ConcreteType().Len()))
+				signature.Write(buf[:n])
 				signature.WriteByte(0x0)
+
 
 				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
 				signature.WriteByte(0x0)
@@ -406,7 +410,6 @@ func (rt *rtype) Signature() string {
 				signature.WriteByte(byte(reflect.Struct))
 				signature.WriteByte(0x0)
 
-				buf := make([]byte, binary.MaxVarintLen64)
 				for f := range rt.ConcreteType().Fields() {
 					var n int
 					n = binary.PutUvarint(buf, uint64(f.Offset))
