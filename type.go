@@ -97,8 +97,16 @@ func newStructField(t *reflect.StructField) *StructField {
 		Offset:    t.Offset,
 		Index:     t.Index,
 		Anonymous: t.Anonymous,
-		Type : 	   typeOf(t.Type),
+		Type:      typeOf(t.Type),
 	}
+}
+
+func derefType(t reflect.Type) (int, Type) {
+	n, ct := DeReferenceType(t)
+	out := &rtype{}
+	out.t = ct
+	out.ct = out
+	return n, out
 }
 
 func typeOf(t reflect.Type) Type {
@@ -109,10 +117,10 @@ func typeOf(t reflect.Type) Type {
 	}
 	mutx.RUnlock()
 
-	n, ct := DeReferenceType(t)
+	n, ct := derefType(t)
 	out := &rtype{
 		t:        t,
-		ct:       typeOf(ct),
+		ct:       ct,
 		ptrCount: n,
 	}
 
@@ -148,8 +156,8 @@ func (rt *rtype) Method(i int) Method {
 
 func (rt *rtype) Methods() iter.Seq[Method] {
 	return func(yield func(Method) bool) {
-		for i := 0; i < rt.t.NumMethod(); i++ {
-			if !yield(Method(rt.t.Method(i))) {
+		for method := range rt.t.Methods() {
+			if !yield(Method(method)) {
 				return
 			}
 		}
@@ -254,8 +262,8 @@ func (rt *rtype) In(i int) Type {
 
 func (rt *rtype) Ins() iter.Seq[Type] {
 	return func(yield func(Type) bool) {
-		for i := 0; i < rt.t.NumIn(); i++ {
-			if !yield(typeOf(rt.t.In(i))) {
+		for in := range rt.t.Ins() {
+			if !yield(typeOf(in)) {
 				return
 			}
 		}
