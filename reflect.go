@@ -11,9 +11,9 @@ import (
 )
 
 type (
-	Converter func(value reflect.Value, typ reflect.Type) (reflect.Value, error)
-	Pipeline  func(sourceFiel, targetField reflect.StructField, sourceValue, targetValue reflect.Value, n int) (bool, error)
-	Type      struct {
+	Converter  func(value reflect.Value, typ reflect.Type) (reflect.Value, error)
+	Pipeline   func(sourceFiel, targetField reflect.StructField, sourceValue, targetValue reflect.Value, n int) (bool, error)
+	___OLDTYPE struct {
 		id       string
 		typ      reflect.Type
 		refCount int
@@ -25,13 +25,13 @@ type (
 var (
 	converters map[reflect.Type]map[reflect.Type]Converter
 	pipeline   []Pipeline
-	typeCache  map[reflect.Type]*Type
+	typeCache  map[reflect.Type]*___OLDTYPE
 	mut        sync.RWMutex
 )
 
 func init() {
 	converters = make(map[reflect.Type]map[reflect.Type]Converter)
-	typeCache = make(map[reflect.Type]*Type)
+	typeCache = make(map[reflect.Type]*___OLDTYPE)
 	pipeline = []Pipeline{
 		TryCustomConvert,
 		TryAssign,
@@ -41,8 +41,8 @@ func init() {
 	}
 }
 
-func NewType(id string, typ reflect.Type, refCount int, size uint, hash string) *Type {
-	return &Type{
+func NewType(id string, typ reflect.Type, refCount int, size uint, hash string) *___OLDTYPE {
+	return &___OLDTYPE{
 		id:       id,
 		typ:      typ,
 		refCount: refCount,
@@ -51,7 +51,7 @@ func NewType(id string, typ reflect.Type, refCount int, size uint, hash string) 
 	}
 }
 
-func Analyze(t reflect.Type) (*Type, error) {
+func Analyze(t reflect.Type) (*___OLDTYPE, error) {
 	n, typ := DeReferenceType(t)
 	mut.RLock()
 	if value, ok := typeCache[typ]; ok {
@@ -167,18 +167,18 @@ func TryCustomConvert(sourceField reflect.StructField, targetField reflect.Struc
 	return true, nil
 }
 
-func SlowConvert(sourceType *Type, targetType *Type, source reflect.Value) (reflect.Value, error) {
+func SlowConvert(sourceType reflect.Type, targetType reflect.Type, source reflect.Value, n int) (reflect.Value, error) {
 	_, leftValue := DeReference(source)
-	targetValue := reflect.New(targetType.typ).Elem()
+	targetValue := reflect.New(targetType).Elem()
 
-	for sourceField := range sourceType.typ.Fields() {
+	for sourceField := range sourceType.Fields() {
 		if !sourceField.IsExported() {
 			continue
 		}
 
 		sourceValue := leftValue.FieldByIndex(sourceField.Index)
 
-		targetField, ok := targetType.typ.FieldByName(sourceField.Name)
+		targetField, ok := targetType.FieldByName(sourceField.Name)
 		if !ok {
 			continue
 		}
@@ -195,7 +195,7 @@ func SlowConvert(sourceType *Type, targetType *Type, source reflect.Value) (refl
 		}
 
 	}
-	ref := Reference(targetType.refCount, targetValue)
+	ref := Reference(n, targetValue)
 
 	return ref.Addr(), nil
 }
@@ -213,5 +213,5 @@ func Convert(source reflect.Value, target reflect.Type) (reflect.Value, error) {
 	if leftType.hash == rightType.hash {
 		return FastConvert(source, target)
 	}
-	return SlowConvert(leftType, rightType, source)
+	return SlowConvert(leftType.typ, rightType.typ, source, rightType.refCount)
 }

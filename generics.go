@@ -6,7 +6,7 @@ import (
 	"unsafe"
 )
 
-func AnalyzeFor[T any]() (*Type, error) {
+func AnalyzeFor[T any]() (*___OLDTYPE, error) {
 	return Analyze(reflect.TypeFor[T]())
 }
 

@@ -14,7 +14,7 @@ type (
 	}
 	Shared2 struct {
 		Value string
-		Test  []int32
+		Test  []int
 	}
 	Left struct {
 		Name   string
