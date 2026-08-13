@@ -138,6 +138,10 @@ func TypeOf(i any) Type {
 	return typeOf(reflect.TypeOf(i))
 }
 
+func TypeFor[T any]() Type {
+	return typeOf(reflect.TypeFor[T]())
+}
+
 func (rt *rtype) GoType() reflect.Type {
 	return rt.t
 }
