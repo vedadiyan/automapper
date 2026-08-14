@@ -35,7 +35,7 @@ func FastConvert(in Value, o Type) (out Value, err error) {
 		}
 	}()
 
-	return valueOf(reflect.NewAt(o.GoType(), in.GoValue().UnsafePointer())), nil
+	return NewAt(o, in.GoValue().UnsafePointer()), nil
 }
 
 func TryAssign(sourceField StructField, targetField StructField, sourceValue Value, targetValue Value, n int) (bool, error) {

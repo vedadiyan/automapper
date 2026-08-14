@@ -342,3 +342,7 @@ func New(t Type) Value {
 func ValueOf(i any) Value {
 	return valueOf(reflect.ValueOf(i))
 }
+
+func NewAt(t Type, p unsafe.Pointer) Value {
+	return valueOf(reflect.NewAt(t.GoType(), p))
+}
