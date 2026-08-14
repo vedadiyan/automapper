@@ -101,6 +101,7 @@ func TryCustomConvert(sourceField Type, targetField Type, sourceValue Value, tar
 		return false, err
 	}
 	targetValue.Set(Reference(targetField.PointerCount(), val))
+
 	return true, nil
 }
 
