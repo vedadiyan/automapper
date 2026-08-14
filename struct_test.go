@@ -19,6 +19,7 @@ type (
 		Name   string
 		Skill  int
 		Shared Shared
+		Map    map[string]int
 		Time   time.Time
 	}
 
@@ -26,6 +27,7 @@ type (
 		Name   string
 		Skill  int
 		Shared Shared2
+		Map    map[*string]***int
 		Time   **string
 	}
 
@@ -59,6 +61,7 @@ func TestConvert(t *testing.T) {
 		Name:   "Pouya",
 		Skill:  10,
 		Shared: Shared{1, []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}},
+		Map:    map[string]int{"Ok": 1, "Then": 2},
 		Time:   time.Now(),
 	}
 

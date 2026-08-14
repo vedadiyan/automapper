@@ -23,6 +23,7 @@ func init() {
 		TryConvert,
 		TryChangeStructType,
 		TryChangeArrayType,
+		TryChangeMapType,
 	}
 }
 
@@ -33,7 +34,7 @@ func FastConvert(in Value, o Type) (out Value, err error) {
 		}
 	}()
 	if in.Kind() != reflect.Pointer {
-		in = in.Addr()
+		in = Reference(1, in)
 	}
 	return NewAt(o, in.UnsafePointer()), nil
 }
@@ -91,6 +92,36 @@ func TryChangeArrayType(sourceField Type, targetField Type, sourceValue Value, t
 			return false, err
 		}
 		targetValue.Set(Reference(targetField.PointerCount(), valueOf(reflect.Append(targetValue.GoValue(), Reference(targetField.Elem().PointerCount(), val.Elem()).GoValue()))))
+	}
+
+	return true, nil
+}
+
+func TryChangeMapType(sourceField Type, targetField Type, sourceValue Value, targetValue Value) (bool, error) {
+	if sourceField.Kind() != reflect.Map || targetField.Kind() != reflect.Map {
+		return false, nil
+	}
+
+	mapRange := sourceValue.MapRange()
+
+	init := false
+
+	for mapRange.Next() {
+		if !init {
+			targetValue.Set(valueOf(reflect.MakeMap(targetField.GoType())))
+			init = true
+		}
+		_, realKey := DeReference(valueOf(mapRange.Key()))
+		key, err := Convert(realKey, targetField.Key().ConcreteType())
+		if err != nil {
+			return false, err
+		}
+		_, realValue := DeReference(valueOf(mapRange.Value()))
+		value, err := Convert(realValue, targetField.Elem().ConcreteType())
+		if err != nil {
+			return false, err
+		}
+		targetValue.SetMapIndex(Reference(targetField.Key().PointerCount(), key.Elem()), Reference(targetField.Elem().PointerCount(), value.Elem()))
 	}
 
 	return true, nil
