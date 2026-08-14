@@ -64,20 +64,30 @@ type (
 		OverflowUint(x uint64) bool
 		CanSeq() bool
 		CanSeq2() bool
-		IdenticalTo(Type) bool
-		Signature() string
+		MemoryLayout() MemoryLayout
 		PointerCount() int
 		ConcreteType() Type
 
 		GoType() reflect.Type
 	}
 
+	MemoryLayout interface {
+		Layout() []byte
+		HashCode() string
+		IdenticalTo(MemoryLayout) bool
+	}
+
 	rtype struct {
 		t         reflect.Type
 		ct        Type
 		ptrCount  int
-		signature string
+		signature MemoryLayout
 		once      sync.Once
+	}
+
+	rmemoryLayout struct {
+		layout []byte
+		hash   string
 	}
 )
 
@@ -336,15 +346,10 @@ func (rt *rtype) CanSeq2() bool {
 	return rt.t.CanSeq2()
 }
 
-func (rt *rtype) IdenticalTo(t Type) bool {
-	if t == nil {
-		return false
-	}
-	return rt.Signature() == t.Signature()
-}
-
-func (rt *rtype) Signature() string {
+func (rt *rtype) MemoryLayout() MemoryLayout {
 	rt.once.Do(func() {
+		out := &rmemoryLayout{}
+
 		signature := bytes.NewBuffer(nil)
 		buf := make([]byte, binary.MaxVarintLen64)
 
@@ -365,8 +370,15 @@ func (rt *rtype) Signature() string {
 			signature.WriteByte(byte(rt.ConcreteType().PointerCount()))
 			signature.WriteByte(0x0)
 
-			sha256 := sha256.Sum256(signature.Bytes())
-			rt.signature = hex.EncodeToString(sha256[:])
+			bytes := signature.Bytes()
+			sha256 := sha256.Sum256(bytes)
+			hash := hex.EncodeToString(sha256[:])
+
+			out.layout = bytes
+			out.hash = hash
+
+			rt.signature = out
+
 			return
 		}
 		switch rt.ConcreteType().Kind() {
@@ -379,11 +391,18 @@ func (rt *rtype) Signature() string {
 				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
 				signature.WriteByte(0x0)
 
-				signature.WriteString(rt.ConcreteType().Elem().ConcreteType().Signature())
+				signature.Write(rt.ConcreteType().Elem().ConcreteType().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
 
-				sha256 := sha256.Sum256(signature.Bytes())
-				rt.signature = hex.EncodeToString(sha256[:])
+				bytes := signature.Bytes()
+				sha256 := sha256.Sum256(bytes)
+				hash := hex.EncodeToString(sha256[:])
+
+				out.layout = bytes
+				out.hash = hash
+
+				rt.signature = out
+
 			}
 		case reflect.Array:
 			{
@@ -398,11 +417,17 @@ func (rt *rtype) Signature() string {
 				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
 				signature.WriteByte(0x0)
 
-				signature.WriteString(rt.ConcreteType().Elem().ConcreteType().Signature())
+				signature.Write(rt.ConcreteType().Elem().ConcreteType().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
 
-				sha256 := sha256.Sum256(signature.Bytes())
-				rt.signature = hex.EncodeToString(sha256[:])
+				bytes := signature.Bytes()
+				sha256 := sha256.Sum256(bytes)
+				hash := hex.EncodeToString(sha256[:])
+
+				out.layout = bytes
+				out.hash = hash
+
+				rt.signature = out
 			}
 		case reflect.Map:
 			{
@@ -416,14 +441,20 @@ func (rt *rtype) Signature() string {
 				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
 				signature.WriteByte(0x0)
 
-				signature.WriteString(rt.ConcreteType().Key().ConcreteType().Signature())
+				signature.Write(rt.ConcreteType().Key().ConcreteType().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
 
-				signature.WriteString(rt.ConcreteType().Elem().ConcreteType().Signature())
+				signature.Write(rt.ConcreteType().Elem().ConcreteType().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
 
-				sha256 := sha256.Sum256(signature.Bytes())
-				rt.signature = hex.EncodeToString(sha256[:])
+				bytes := signature.Bytes()
+				sha256 := sha256.Sum256(bytes)
+				hash := hex.EncodeToString(sha256[:])
+
+				out.layout = bytes
+				out.hash = hash
+
+				rt.signature = out
 			}
 		case reflect.Struct:
 			{
@@ -456,8 +487,14 @@ func (rt *rtype) Signature() string {
 					signature.WriteByte(0x0)
 					signature.WriteByte(0x0)
 				}
-				sha256 := sha256.Sum256(signature.Bytes())
-				rt.signature = hex.EncodeToString(sha256[:])
+				bytes := signature.Bytes()
+				sha256 := sha256.Sum256(bytes)
+				hash := hex.EncodeToString(sha256[:])
+
+				out.layout = bytes
+				out.hash = hash
+
+				rt.signature = out
 			}
 		}
 
@@ -472,4 +509,19 @@ func (rt *rtype) PointerCount() int {
 
 func (rt *rtype) ConcreteType() Type {
 	return rt.ct
+}
+
+func (rml *rmemoryLayout) Layout() []byte {
+	return rml.layout
+}
+
+func (rml *rmemoryLayout) HashCode() string {
+	return rml.hash
+}
+
+func (rml *rmemoryLayout) IdenticalTo(t MemoryLayout) bool {
+	if t == nil {
+		return false
+	}
+	return rml.HashCode() == t.HashCode()
 }
