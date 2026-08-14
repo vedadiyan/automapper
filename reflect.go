@@ -42,7 +42,9 @@ func TryAssign(sourceField Type, targetField Type, sourceValue Value, targetValu
 	if !sourceField.AssignableTo(targetField) {
 		return false, nil
 	}
+
 	targetValue.Set(Reference(targetField.PointerCount(), sourceValue))
+
 	return true, nil
 }
 
@@ -50,7 +52,9 @@ func TryConvert(sourceField Type, targetField Type, sourceValue Value, targetVal
 	if !sourceField.ConvertibleTo(targetField) {
 		return false, nil
 	}
+
 	targetValue.Set(Reference(targetField.PointerCount(), sourceValue.Convert(targetField)))
+
 	return true, nil
 }
 
@@ -58,6 +62,7 @@ func TryChangeStructType(sourceField Type, targetField Type, sourceValue Value, 
 	if sourceField.Kind() != reflect.Struct || targetField.Kind() != reflect.Struct {
 		return false, nil
 	}
+
 	for i := range sourceField.Fields() {
 		target, ok := targetField.FieldByName(i.Name)
 		if !ok {
@@ -118,6 +123,7 @@ func SlowConvert(sourceType Type, targetType Type, source Value) (Value, error) 
 			break
 		}
 	}
+
 	ref := Reference(targetType.PointerCount(), targetValue)
 
 	return ref.Addr(), nil
