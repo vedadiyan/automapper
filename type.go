@@ -396,15 +396,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 
 				signature.Write(rt.ConcreteType().Elem().ConcreteType().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
-
-				bytes := signature.Bytes()
-				sha256 := sha256.Sum256(bytes)
-				hash := hex.EncodeToString(sha256[:])
-
-				out.layout = bytes
-				out.hash = hash
-
-				rt.signature = out
 			}
 		case reflect.Map:
 			{
