@@ -39,7 +39,7 @@ func Reference(n int, v Value) Value {
 	return ref
 }
 
-func TargetFieldName(field reflect.StructField) string {
+func TargetFieldName(field StructField) string {
 	if val, ok := field.Tag.Lookup("mapto"); ok {
 		return val
 	}
