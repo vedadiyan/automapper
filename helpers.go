@@ -14,14 +14,6 @@ func FindConverter(l reflect.Type, r reflect.Type) (Converter, bool) {
 	return rVal, true
 }
 
-func DeReferenceType(v reflect.Type) (int, reflect.Type) {
-	i := 0
-	for ; v.Kind() == reflect.Pointer; i++ {
-		v = v.Elem()
-	}
-	return i, v
-}
-
 func DeReference(v reflect.Value) (int, reflect.Value) {
 	i := 0
 	for ; v.Kind() == reflect.Pointer; i++ {

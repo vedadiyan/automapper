@@ -617,3 +617,36 @@ func (rml *rmemoryLayout) IdenticalTo(t MemoryLayout) bool {
 	}
 	return rml.HashCode() == t.HashCode()
 }
+
+func DeReferenceType(v reflect.Type) (int, reflect.Type) {
+	i := 0
+	for ; v.Kind() == reflect.Pointer; i++ {
+		v = v.Elem()
+	}
+	return i, v
+}
+
+func DeReference(v reflect.Value) (int, reflect.Value) {
+	i := 0
+	for ; v.Kind() == reflect.Pointer; i++ {
+		v = v.Elem()
+	}
+	return i, v
+}
+
+func Reference(n int, v reflect.Value) reflect.Value {
+	if n == 0 {
+		return v
+	}
+
+	ref := reflect.New(v.Type())
+	ref.Elem().Set(v)
+
+	for range n - 1 {
+		next := reflect.New(ref.Type())
+		next.Elem().Set(ref)
+		ref = next
+	}
+
+	return ref
+}
