@@ -12,7 +12,7 @@ import (
 
 type (
 	Kind        = reflect.Kind
-	ChanDir     reflect.ChanDir
+	ChanDir     = reflect.ChanDir
 	StructField struct {
 		Type    Type
 		Name    string
