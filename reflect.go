@@ -7,7 +7,7 @@ import (
 
 type (
 	Converter func(value Value, typ Type) (Value, error)
-	Pipeline  func(sourceFiel, targetField StructField, sourceValue, targetValue Value, n int) (bool, error)
+	Pipeline  func(sourceFiel, targetField Type, sourceValue, targetValue Value, n int) (bool, error)
 )
 
 var (
@@ -32,48 +32,66 @@ func FastConvert(in Value, o Type) (out Value, err error) {
 			err = fmt.Errorf("%v", r)
 		}
 	}()
-
-	return NewAt(o, in.GoValue().UnsafePointer()), nil
+	if in.Kind() != reflect.Pointer {
+		in = in.Addr()
+	}
+	return NewAt(o, in.UnsafePointer()), nil
 }
 
-func TryAssign(sourceField StructField, targetField StructField, sourceValue Value, targetValue Value, n int) (bool, error) {
-	if !sourceField.Type.AssignableTo(targetField.Type) {
+func TryAssign(sourceField Type, targetField Type, sourceValue Value, targetValue Value, n int) (bool, error) {
+	if !sourceField.AssignableTo(targetField) {
 		return false, nil
 	}
-	targetValue.FieldByIndex(targetField.Index).Set(Reference(n, sourceValue))
+	targetValue.Set(Reference(n, sourceValue))
 	return true, nil
 }
 
-func TryConvert(sourceField StructField, targetField StructField, sourceValue Value, targetValue Value, n int) (bool, error) {
-	if !sourceField.Type.ConvertibleTo(targetField.Type) {
+func TryConvert(sourceField Type, targetField Type, sourceValue Value, targetValue Value, n int) (bool, error) {
+	if !sourceField.ConvertibleTo(targetField) {
 		return false, nil
 	}
-	targetValue.FieldByIndex(targetField.Index).Set(Reference(n, sourceValue.Convert(targetField.Type)))
+	targetValue.Set(Reference(n, sourceValue.Convert(targetField)))
 	return true, nil
 }
 
-func TryChangeStructType(sourceField StructField, targetField StructField, sourceValue Value, targetValue Value, n int) (bool, error) {
-	if sourceField.Type.Kind() != reflect.Struct || targetField.Type.Kind() != reflect.Struct {
+func TryChangeStructType(sourceField Type, targetField Type, sourceValue Value, targetValue Value, _ int) (bool, error) {
+	if sourceField.Kind() != reflect.Struct || targetField.Kind() != reflect.Struct {
 		return false, nil
 	}
-	val, err := Convert(sourceValue, targetField.Type)
-	if err != nil {
-		return false, nil
+	for i := range sourceField.Fields() {
+		target, ok := targetField.FieldByName(i.Name)
+		if !ok {
+			continue
+		}
+		_, realValue := DeReference(sourceValue.FieldByIndex(i.Index))
+		val, err := Convert(realValue, target.Type.ConcreteType())
+		if err != nil {
+			return false, err
+		}
+		targetValue.FieldByIndex(target.Index).Set(Reference(target.Type.PointerCount(), val.Elem()))
 	}
-	targetValue.FieldByIndex(targetField.Index).Set(Reference(n, val.Elem()))
+
 	return true, nil
 }
 
-func TryChangeArrayType(sourceField StructField, targetField StructField, sourceValue Value, targetValue Value, n int) (bool, error) {
-	if (sourceField.Type.Kind() != reflect.Slice && sourceField.Type.Kind() != reflect.Array) || (targetField.Type.Kind() != reflect.Slice && targetField.Type.Kind() != reflect.Array) {
+func TryChangeArrayType(sourceField Type, targetField Type, sourceValue Value, targetValue Value, _n int) (bool, error) {
+	if (sourceField.Kind() != reflect.Slice && sourceField.Kind() != reflect.Array) || (targetField.Kind() != reflect.Slice && targetField.Kind() != reflect.Array) {
 		return false, nil
+	}
+
+	for i := range sourceValue.Len() {
+		val, err := Convert(sourceValue.Index(i), targetField.Elem().ConcreteType())
+		if err != nil {
+			return false, err
+		}
+		targetValue.Set(Reference(targetField.PointerCount(), valueOf(reflect.Append(targetValue.GoValue(), Reference(targetField.Elem().PointerCount(), val.Elem()).GoValue()))))
 	}
 
 	return true, nil
 }
 
-func TryCustomConvert(sourceField StructField, targetField StructField, sourceValue Value, targetValue Value, n int) (bool, error) {
-	conv, ok := FindConverter(sourceField.Type, targetField.Type)
+func TryCustomConvert(sourceField Type, targetField Type, sourceValue Value, targetValue Value, n int) (bool, error) {
+	conv, ok := FindConverter(sourceField, targetField)
 	if !ok {
 		return false, nil
 	}
@@ -81,7 +99,7 @@ func TryCustomConvert(sourceField StructField, targetField StructField, sourceVa
 	if err != nil {
 		return false, err
 	}
-	targetValue.FieldByIndex(targetField.Index).Set(Reference(n, val))
+	targetValue.Set(Reference(n, val))
 	return true, nil
 }
 
@@ -89,28 +107,14 @@ func SlowConvert(sourceType Type, targetType Type, source Value) (Value, error) 
 	_, leftValue := DeReference(source)
 	targetValue := New(targetType.ConcreteType()).Elem()
 
-	for sourceField := range sourceType.ConcreteType().Fields() {
-		if !sourceField.IsExported() {
-			continue
+	for _, p := range pipeline {
+		ok, err := p(sourceType.ConcreteType(), targetType.ConcreteType(), leftValue, targetValue, sourceType.PointerCount())
+		if err != nil {
+			return Zero[Value](), err
 		}
-
-		sourceValue := leftValue.FieldByIndex(sourceField.Index)
-
-		targetField, ok := targetType.FieldByName(sourceField.Name)
-		if !ok {
-			continue
+		if ok {
+			break
 		}
-
-		for _, p := range pipeline {
-			ok, err := p(sourceField, targetField, sourceValue, targetValue, sourceField.Type.PointerCount())
-			if err != nil {
-				return Zero[Value](), err
-			}
-			if ok {
-				break
-			}
-		}
-
 	}
 	ref := Reference(targetType.PointerCount(), targetValue)
 
