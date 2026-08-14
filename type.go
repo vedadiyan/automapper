@@ -2,14 +2,14 @@ package mapper
 
 import (
 	"bytes"
-	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"iter"
 	"reflect"
 	"sync"
-	"time"
+	"sync/atomic"
 )
 
 type (
@@ -105,8 +105,9 @@ type (
 )
 
 var (
-	types map[reflect.Type]func() Type
-	mutx  sync.RWMutex
+	types   map[reflect.Type]func() Type
+	mutx    sync.RWMutex
+	counter atomic.Uint64
 )
 
 func init() {
@@ -161,7 +162,7 @@ func typeOf(t reflect.Type) Type {
 	fn := sync.OnceValue(func() Type {
 		n, ct := DeReferenceType(t)
 		out := &rtype{
-			id:       fmt.Sprintf("%d", time.Now().UnixNano()),
+			id:       fmt.Sprintf("%d", counter.Add(1)),
 			t:        t,
 			ptrCount: n,
 		}
@@ -582,8 +583,8 @@ func (rt *rtype) memoryLayout(lt map[string]Type) MemoryLayout {
 			}
 		}
 		bytes := signature.Bytes()
-		sha256 := sha256.Sum256(bytes)
-		hash := hex.EncodeToString(sha256[:])
+		sha512 := sha512.Sum512(bytes)
+		hash := hex.EncodeToString(sha512[:])
 
 		out.layout = bytes
 		out.hash = hash
