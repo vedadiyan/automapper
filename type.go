@@ -99,12 +99,12 @@ type (
 )
 
 var (
-	types map[reflect.Type]Type
+	types map[reflect.Type]func() Type
 	mutx  sync.RWMutex
 )
 
 func init() {
-	types = make(map[reflect.Type]Type)
+	types = make(map[reflect.Type]func() Type)
 }
 
 func newStructField(t *reflect.StructField) StructField {
@@ -140,32 +140,27 @@ func typeOf(t reflect.Type) Type {
 		return nil
 	}
 
-	mutx.RLock()
-	if val, ok := types[t]; ok {
-		mutx.RUnlock()
-		return val
-	}
-	mutx.RUnlock()
-
-	n, ct := DeReferenceType(t)
-	out := &rtype{
-		t:        t,
-		ptrCount: n,
-	}
-	if n != 0 {
-		out.ct = typeOf(ct)
-	} else {
-		out.ct = out
-	}
-
 	mutx.Lock()
 	if val, ok := types[t]; ok {
 		mutx.Unlock()
-		return val
+		return val()
 	}
-	types[t] = out
+
+	types[t] = sync.OnceValue(func() Type {
+		n, ct := DeReferenceType(t)
+		out := &rtype{
+			t:        t,
+			ptrCount: n,
+		}
+		if n != 0 {
+			out.ct = typeOf(ct)
+		} else {
+			out.ct = out
+		}
+		return out
+	})
 	mutx.Unlock()
-	return out
+	return types[t]()
 }
 
 func TypeOf(i any) Type {
@@ -382,7 +377,7 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 				signature.WriteByte(byte(reflect.Slice))
 				signature.WriteByte(0x0)
 
-				signature.Write(rt.ConcreteType().Elem().ConcreteType().MemoryLayout().Layout())
+				signature.Write(rt.ConcreteType().Elem().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
 			}
 		case reflect.Array:
@@ -394,7 +389,7 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 				signature.Write(buf[:n])
 				signature.WriteByte(0x0)
 
-				signature.Write(rt.ConcreteType().Elem().ConcreteType().MemoryLayout().Layout())
+				signature.Write(rt.ConcreteType().Elem().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
 			}
 		case reflect.Map:
