@@ -378,13 +378,14 @@ func (rt *rtype) ID() string {
 	return rt.id
 }
 
-func (rt *rtype) MemoryLayout() MemoryLayout { 
+func (rt *rtype) MemoryLayout() MemoryLayout {
 	return rt.memoryLayout(make(map[string]Type))
 }
 
 func (rt *rtype) memoryLayout(lt map[string]Type) MemoryLayout {
 	rt.once.Do(func() {
 		lt[rt.id] = rt
+		defer delete(lt, rt.id)
 		out := &rmemoryLayout{}
 
 		signature := bytes.NewBuffer(nil)
