@@ -21,9 +21,9 @@ type (
 		CanInterface() bool
 		CanSet() bool
 		CanUint() bool
-		CanUnsafePointer() bool
 		Cap() int
-		Chan() Value
+		Clear()
+		Close()
 		Comparable() bool
 		Complex() complex128
 		Convert(t Type) Value
@@ -35,7 +35,6 @@ type (
 		FieldByName(name string) Value
 		FieldByNameFunc(match func(string) bool) Value
 		Float() float64
-		GoString() string
 		Index(i int) Value
 		Int() int64
 		IsNil() bool
@@ -72,7 +71,6 @@ type (
 		SetString(s string)
 		SetUint(x uint64)
 		SetZero()
-		Sharp() Value
 		Slice(i, j int) Value
 		Slice3(i, j, k int) Value
 		String() string
@@ -89,7 +87,7 @@ type (
 )
 
 func valueOf(r reflect.Value) Value {
-	return nil
+	return &rvalue{r}
 }
 
 func (rv rvalue) Addr() reflect.Value {
@@ -331,4 +329,8 @@ func (rv rvalue) Uint() uint64 {
 }
 func (rv rvalue) Interface() any {
 	return rv.v.Interface()
+}
+
+func (rv rvalue) GoValue() reflect.Value {
+	return rv.v
 }
