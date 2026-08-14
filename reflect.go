@@ -1,37 +1,24 @@
 package mapper
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"reflect"
 	"sync"
 )
 
 type (
-	Converter  func(value reflect.Value, typ reflect.Type) (reflect.Value, error)
-	Pipeline   func(sourceFiel, targetField reflect.StructField, sourceValue, targetValue reflect.Value, n int) (bool, error)
-	___OLDTYPE struct {
-		id       string
-		typ      reflect.Type
-		refCount int
-		size     uint
-		hash     string
-	}
+	Converter func(value Value, typ Type) (Value, error)
+	Pipeline  func(sourceFiel, targetField StructField, sourceValue, targetValue Value, n int) (bool, error)
 )
 
 var (
-	converters map[reflect.Type]map[reflect.Type]Converter
+	converters map[Type]map[Type]Converter
 	pipeline   []Pipeline
-	typeCache  map[reflect.Type]*___OLDTYPE
 	mut        sync.RWMutex
 )
 
 func init() {
-	converters = make(map[reflect.Type]map[reflect.Type]Converter)
-	typeCache = make(map[reflect.Type]*___OLDTYPE)
+	converters = make(map[Type]map[Type]Converter)
 	pipeline = []Pipeline{
 		TryCustomConvert,
 		TryAssign,
@@ -41,73 +28,17 @@ func init() {
 	}
 }
 
-func NewType(id string, typ reflect.Type, refCount int, size uint, hash string) *___OLDTYPE {
-	return &___OLDTYPE{
-		id:       id,
-		typ:      typ,
-		refCount: refCount,
-		size:     size,
-		hash:     hash,
-	}
-}
-
-func Analyze(t reflect.Type) (*___OLDTYPE, error) {
-	n, typ := DeReferenceType(t)
-	mut.RLock()
-	if value, ok := typeCache[typ]; ok {
-		mut.RUnlock()
-		return value, nil
-	}
-	mut.RUnlock()
-
-	mut.Lock()
-	defer mut.Unlock()
-	if value, ok := typeCache[typ]; ok {
-		return value, nil
-	}
-	id := fmt.Sprintf("%s.%s", typ.PkgPath(), typ.Name())
-	signature := bytes.NewBuffer(nil)
-	buf := make([]byte, binary.MaxVarintLen64)
-
-	for field := range typ.Fields() {
-		dn, fieldType := DeReferenceType(field.Type)
-		l := binary.PutUvarint(buf, uint64(dn))
-		signature.Write(buf[:l])
-		signature.WriteByte(0)
-		l = binary.PutUvarint(buf, uint64(field.Offset))
-		signature.Write(buf[:l])
-		signature.WriteByte(0)
-		l = binary.PutUvarint(buf, uint64(fieldType.Align()))
-		signature.Write(buf[:l])
-		signature.WriteByte(0)
-		l = binary.PutUvarint(buf, uint64(fieldType.Size()))
-		signature.Write(buf[:l])
-		signature.WriteByte(0)
-		l = binary.PutUvarint(buf, uint64(fieldType.Kind()))
-		signature.Write(buf[:l])
-		signature.WriteByte(0)
-	}
-	sha256 := sha256.New()
-	if _, err := sha256.Write(signature.Bytes()); err != nil {
-		return nil, err
-	}
-	hash := sha256.Sum(nil)
-	val := NewType(id, typ, n, uint(typ.Size()), hex.EncodeToString(hash))
-	typeCache[typ] = val
-	return val, nil
-}
-
-func FastConvert(in reflect.Value, o reflect.Type) (out reflect.Value, err error) {
+func FastConvert(in Value, o Type) (out Value, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("%v", r)
 		}
 	}()
 
-	return reflect.NewAt(o, in.UnsafePointer()), nil
+	return valueOf(reflect.NewAt(o.GoType(), in.GoValue().UnsafePointer())), nil
 }
 
-func TryAssign(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error) {
+func TryAssign(sourceField StructField, targetField StructField, sourceValue Value, targetValue Value, n int) (bool, error) {
 	if !sourceField.Type.AssignableTo(targetField.Type) {
 		return false, nil
 	}
@@ -115,7 +46,7 @@ func TryAssign(sourceField reflect.StructField, targetField reflect.StructField,
 	return true, nil
 }
 
-func TryConvert(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error) {
+func TryConvert(sourceField StructField, targetField StructField, sourceValue Value, targetValue Value, n int) (bool, error) {
 	if !sourceField.Type.ConvertibleTo(targetField.Type) {
 		return false, nil
 	}
@@ -123,18 +54,7 @@ func TryConvert(sourceField reflect.StructField, targetField reflect.StructField
 	return true, nil
 }
 
-func TryDereference(sourceField *reflect.StructField, targetField *reflect.StructField, sourceValue *reflect.Value) int {
-	_, realSourceType := DeReferenceType(sourceField.Type)
-	n, realTargetType := DeReferenceType(targetField.Type)
-
-	sourceField.Type = realSourceType
-	targetField.Type = realTargetType
-
-	_, *sourceValue = DeReference(*sourceValue)
-	return n
-}
-
-func TryChangeStructType(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error) {
+func TryChangeStructType(sourceField StructField, targetField StructField, sourceValue Value, targetValue Value, n int) (bool, error) {
 	if sourceField.Type.Kind() != reflect.Struct || targetField.Type.Kind() != reflect.Struct {
 		return false, nil
 	}
@@ -146,7 +66,7 @@ func TryChangeStructType(sourceField reflect.StructField, targetField reflect.St
 	return true, nil
 }
 
-func TryChangeArrayType(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error) {
+func TryChangeArrayType(sourceField StructField, targetField StructField, sourceValue Value, targetValue Value, n int) (bool, error) {
 	if (sourceField.Type.Kind() != reflect.Slice && sourceField.Type.Kind() != reflect.Array) || (targetField.Type.Kind() != reflect.Slice && targetField.Type.Kind() != reflect.Array) {
 		return false, nil
 	}
@@ -154,7 +74,7 @@ func TryChangeArrayType(sourceField reflect.StructField, targetField reflect.Str
 	return true, nil
 }
 
-func TryCustomConvert(sourceField reflect.StructField, targetField reflect.StructField, sourceValue reflect.Value, targetValue reflect.Value, n int) (bool, error) {
+func TryCustomConvert(sourceField StructField, targetField StructField, sourceValue Value, targetValue Value, n int) (bool, error) {
 	conv, ok := FindConverter(sourceField.Type, targetField.Type)
 	if !ok {
 		return false, nil
@@ -167,9 +87,9 @@ func TryCustomConvert(sourceField reflect.StructField, targetField reflect.Struc
 	return true, nil
 }
 
-func SlowConvert(sourceType reflect.Type, targetType reflect.Type, source reflect.Value, n int) (reflect.Value, error) {
+func SlowConvert(sourceType Type, targetType Type, source Value) (Value, error) {
 	_, leftValue := DeReference(source)
-	targetValue := reflect.New(targetType).Elem()
+	targetValue := New(targetType.ConcreteType()).Elem()
 
 	for sourceField := range sourceType.Fields() {
 		if !sourceField.IsExported() {
@@ -183,11 +103,10 @@ func SlowConvert(sourceType reflect.Type, targetType reflect.Type, source reflec
 			continue
 		}
 
-		n := TryDereference(&sourceField, &targetField, &sourceValue)
 		for _, p := range pipeline {
-			ok, err := p(sourceField, targetField, sourceValue, targetValue, n)
+			ok, err := p(sourceField, targetField, sourceValue, targetValue, sourceField.Type.PointerCount())
 			if err != nil {
-				return Zero[reflect.Value](), err
+				return Zero[Value](), err
 			}
 			if ok {
 				break
@@ -195,23 +114,16 @@ func SlowConvert(sourceType reflect.Type, targetType reflect.Type, source reflec
 		}
 
 	}
-	ref := Reference(n, targetValue)
+	ref := Reference(targetType.PointerCount(), targetValue)
 
 	return ref.Addr(), nil
 }
-func Convert(source reflect.Value, target reflect.Type) (reflect.Value, error) {
-	var zero reflect.Value
+func Convert(source Value, target Type) (Value, error) {
 
-	leftType, err := Analyze(source.Type())
-	if err != nil {
-		return zero, err
-	}
-	rightType, err := Analyze(target)
-	if err != nil {
-		return zero, err
-	}
-	if leftType.hash == rightType.hash {
+	leftType := source.Type()
+
+	if leftType.MemoryLayout().IdenticalTo(target.MemoryLayout()) {
 		return FastConvert(source, target)
 	}
-	return SlowConvert(leftType.typ, rightType.typ, source, rightType.refCount)
+	return SlowConvert(leftType, target, source)
 }

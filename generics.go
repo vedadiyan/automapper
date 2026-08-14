@@ -6,10 +6,6 @@ import (
 	"unsafe"
 )
 
-func AnalyzeFor[T any]() (*___OLDTYPE, error) {
-	return Analyze(reflect.TypeFor[T]())
-}
-
 func FastConvertFor[T any, R any](in *T) (r *R, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -20,7 +16,7 @@ func FastConvertFor[T any, R any](in *T) (r *R, err error) {
 }
 
 func ConvertFor[T any, R any](in *T) (*R, error) {
-	out, err := Convert(reflect.ValueOf(in), reflect.TypeFor[R]())
+	out, err := Convert(ValueOf(in), typeOf(reflect.TypeFor[R]()))
 	if err != nil {
 		return nil, err
 	}

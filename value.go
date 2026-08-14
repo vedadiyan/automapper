@@ -8,7 +8,7 @@ import (
 type (
 	MapIter = reflect.MapIter
 	Value   interface {
-		Addr() reflect.Value
+		Addr() Value
 		Bool() bool
 		Bytes() []byte
 		Call(in []Value) []Value
@@ -90,8 +90,8 @@ func valueOf(r reflect.Value) Value {
 	return &rvalue{r}
 }
 
-func (rv rvalue) Addr() reflect.Value {
-	return rv.v.Addr()
+func (rv rvalue) Addr() Value {
+	return valueOf(rv.v.Addr())
 }
 func (rv rvalue) Bool() bool {
 	return rv.Bool()
@@ -333,4 +333,12 @@ func (rv rvalue) Interface() any {
 
 func (rv rvalue) GoValue() reflect.Value {
 	return rv.v
+}
+
+func New(t Type) Value {
+	return valueOf(reflect.New(t.GoType()))
+}
+
+func ValueOf(i any) Value {
+	return valueOf(reflect.ValueOf(i))
 }

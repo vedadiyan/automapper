@@ -24,6 +24,8 @@ type (
 		Offset    uintptr
 		Index     []int
 		Anonymous bool
+
+		structField *reflect.StructField
 	}
 	Method struct {
 		Name    string
@@ -120,14 +122,19 @@ func newStructField(t *reflect.StructField) StructField {
 	}
 
 	return StructField{
-		Name:      t.Name,
-		PkgPath:   t.PkgPath,
-		Tag:       t.Tag,
-		Offset:    t.Offset,
-		Index:     t.Index,
-		Anonymous: t.Anonymous,
-		Type:      typeOf(t.Type),
+		Name:        t.Name,
+		PkgPath:     t.PkgPath,
+		Tag:         t.Tag,
+		Offset:      t.Offset,
+		Index:       t.Index,
+		Anonymous:   t.Anonymous,
+		Type:        typeOf(t.Type),
+		structField: t,
 	}
+}
+
+func (st StructField) IsExported() bool {
+	return st.structField.IsExported()
 }
 
 func newMethod(t *reflect.Method) Method {
