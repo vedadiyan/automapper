@@ -384,16 +384,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 
 				signature.Write(rt.ConcreteType().Elem().ConcreteType().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
-
-				bytes := signature.Bytes()
-				sha256 := sha256.Sum256(bytes)
-				hash := hex.EncodeToString(sha256[:])
-
-				out.layout = bytes
-				out.hash = hash
-
-				rt.signature = out
-
 			}
 		case reflect.Array:
 			{
@@ -426,15 +416,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 
 				signature.Write(rt.ConcreteType().Elem().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
-
-				bytes := signature.Bytes()
-				sha256 := sha256.Sum256(bytes)
-				hash := hex.EncodeToString(sha256[:])
-
-				out.layout = bytes
-				out.hash = hash
-
-				rt.signature = out
 			}
 		case reflect.Struct:
 			{
@@ -457,14 +438,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 					signature.WriteByte(0x0)
 					signature.WriteByte(0x0)
 				}
-				bytes := signature.Bytes()
-				sha256 := sha256.Sum256(bytes)
-				hash := hex.EncodeToString(sha256[:])
-
-				out.layout = bytes
-				out.hash = hash
-
-				rt.signature = out
 			}
 		case reflect.Func:
 			{
@@ -488,14 +461,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 					signature.WriteByte(0x0)
 					signature.WriteByte(0x0)
 				}
-				bytes := signature.Bytes()
-				sha256 := sha256.Sum256(bytes)
-				hash := hex.EncodeToString(sha256[:])
-
-				out.layout = bytes
-				out.hash = hash
-
-				rt.signature = out
 			}
 		case reflect.Interface:
 			{
@@ -525,16 +490,7 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 						signature.WriteByte(0x0)
 						signature.WriteByte(0x0)
 					}
-
 				}
-				bytes := signature.Bytes()
-				sha256 := sha256.Sum256(bytes)
-				hash := hex.EncodeToString(sha256[:])
-
-				out.layout = bytes
-				out.hash = hash
-
-				rt.signature = out
 			}
 		default:
 			{
@@ -551,18 +507,16 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 
 				signature.WriteByte(byte(rt.ConcreteType().PointerCount()))
 				signature.WriteByte(0x0)
-
-				bytes := signature.Bytes()
-				sha256 := sha256.Sum256(bytes)
-				hash := hex.EncodeToString(sha256[:])
-
-				out.layout = bytes
-				out.hash = hash
-
-				rt.signature = out
 			}
 		}
+		bytes := signature.Bytes()
+		sha256 := sha256.Sum256(bytes)
+		hash := hex.EncodeToString(sha256[:])
 
+		out.layout = bytes
+		out.hash = hash
+
+		rt.signature = out
 	})
 
 	return rt.signature
