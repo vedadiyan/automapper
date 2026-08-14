@@ -80,7 +80,8 @@ func TryChangeArrayType(sourceField Type, targetField Type, sourceValue Value, t
 	}
 
 	for i := range sourceValue.Len() {
-		val, err := Convert(sourceValue.Index(i), targetField.Elem().ConcreteType())
+		_, realValue := DeReference(sourceValue.Index(i))
+		val, err := Convert(realValue, targetField.Elem().ConcreteType())
 		if err != nil {
 			return false, err
 		}
