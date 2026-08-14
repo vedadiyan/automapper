@@ -379,7 +379,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 		switch rt.ConcreteType().Kind() {
 		case reflect.Slice:
 			{
-				signature := bytes.NewBuffer(nil)
 				signature.WriteByte(byte(reflect.Slice))
 				signature.WriteByte(0x0)
 
@@ -398,7 +397,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 			}
 		case reflect.Array:
 			{
-				signature := bytes.NewBuffer(nil)
 				signature.WriteByte(byte(reflect.Array))
 				signature.WriteByte(0x0)
 
@@ -420,7 +418,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 			}
 		case reflect.Map:
 			{
-				signature := bytes.NewBuffer(nil)
 				signature.WriteByte(byte(reflect.Map))
 				signature.WriteByte(0x0)
 
@@ -441,7 +438,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 			}
 		case reflect.Struct:
 			{
-				signature := bytes.NewBuffer(nil)
 				signature.WriteByte(byte(reflect.Struct))
 				signature.WriteByte(0x0)
 
@@ -472,7 +468,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 			}
 		case reflect.Func:
 			{
-				signature := bytes.NewBuffer(nil)
 				signature.WriteByte(byte(reflect.Func))
 				signature.WriteByte(0x0)
 
@@ -504,7 +499,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 			}
 		case reflect.Interface:
 			{
-				signature := bytes.NewBuffer(nil)
 				signature.WriteByte(byte(reflect.Interface))
 				signature.WriteByte(0x0)
 
