@@ -15,11 +15,12 @@ import (
 type (
 	Kind        = reflect.Kind
 	ChanDir     = reflect.ChanDir
+	StructTag   = reflect.StructTag
 	StructField struct {
-		Type    Type
-		Name    string
-		PkgPath string
-		//Tag       StructTag
+		Type      Type
+		Name      string
+		PkgPath   string
+		Tag       StructTag
 		Offset    uintptr
 		Index     []int
 		Anonymous bool
@@ -120,6 +121,7 @@ func newStructField(t *reflect.StructField) StructField {
 	return StructField{
 		Name:      t.Name,
 		PkgPath:   t.PkgPath,
+		Tag:       t.Tag,
 		Offset:    t.Offset,
 		Index:     t.Index,
 		Anonymous: t.Anonymous,
