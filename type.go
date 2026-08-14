@@ -489,12 +489,28 @@ func (rt *rtype) memoryLayout(lt map[string]Type) MemoryLayout {
 				signature.WriteByte(0x0)
 
 				for i := range rt.Ins() {
+					if val, ok := lt[i.ID()]; ok {
+						signature.WriteString(val.ID())
+						signature.WriteByte(0x0)
+						signature.WriteByte(0x0)
+						continue
+
+					}
+
 					signature.Write(i.memoryLayout(lt).Layout())
 					signature.WriteByte(0x0)
 					signature.WriteByte(0x0)
 				}
 
 				for i := range rt.Outs() {
+					if val, ok := lt[i.ID()]; ok {
+						signature.WriteString(val.ID())
+						signature.WriteByte(0x0)
+						signature.WriteByte(0x0)
+						continue
+
+					}
+
 					signature.Write(i.memoryLayout(lt).Layout())
 					signature.WriteByte(0x0)
 					signature.WriteByte(0x0)
@@ -518,12 +534,28 @@ func (rt *rtype) memoryLayout(lt map[string]Type) MemoryLayout {
 					signature.WriteByte(0x0)
 
 					for i := range f.Type.Ins() {
+						if val, ok := lt[i.ID()]; ok {
+							signature.WriteString(val.ID())
+							signature.WriteByte(0x0)
+							signature.WriteByte(0x0)
+							continue
+
+						}
+
 						signature.Write(i.memoryLayout(lt).Layout())
 						signature.WriteByte(0x0)
 						signature.WriteByte(0x0)
 					}
 
 					for i := range f.Type.Outs() {
+						if val, ok := lt[i.ID()]; ok {
+							signature.WriteString(val.ID())
+							signature.WriteByte(0x0)
+							signature.WriteByte(0x0)
+							continue
+
+						}
+
 						signature.Write(i.memoryLayout(lt).Layout())
 						signature.WriteByte(0x0)
 						signature.WriteByte(0x0)
