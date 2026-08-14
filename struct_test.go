@@ -2,7 +2,6 @@ package mapper
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 )
@@ -56,19 +55,6 @@ func (TIII) A() bool {
 
 func TestConvert(t *testing.T) {
 
-	var intA TI
-
-	intA = &TII{}
-
-	xxxx, err := FastConvertFor[TI, T2](&intA)
-
-	zzzz := *xxxx
-
-	yyyy := zzzz.A()
-	_ = yyyy
-	n := reflect.TypeOf(nil)
-
-	_ = n
 	left := &Left{
 		Name:   "Pouya",
 		Skill:  10,
@@ -76,17 +62,20 @@ func TestConvert(t *testing.T) {
 		Time:   time.Now(),
 	}
 
-	strType := reflect.TypeFor[string]()
-	converters[reflect.TypeFor[time.Time]()] = map[reflect.Type]Converter{
-		strType: func(value reflect.Value, typ reflect.Type) (reflect.Value, error) {
-			return reflect.ValueOf(fmt.Sprintf("%s", value.Interface())), nil
+	strType := TypeFor[string]()
+	converters[TypeFor[time.Time]()] = map[Type]Converter{
+		strType: func(value Value, typ Type) (Value, error) {
+			return ValueOf(fmt.Sprintf("%s", value.Interface())), nil
 		},
 	}
-	converters[reflect.TypeFor[int]()] = map[reflect.Type]Converter{
-		strType: func(value reflect.Value, typ reflect.Type) (reflect.Value, error) {
-			return reflect.ValueOf(fmt.Sprintf("%d", value.Interface())), nil
+	converters[TypeFor[int]()] = map[Type]Converter{
+		strType: func(value Value, typ Type) (Value, error) {
+			return ValueOf(fmt.Sprintf("%d", value.Interface())), nil
 		},
 	}
+
+	TypeFor[Left]().MemoryLayout()
+	TypeFor[Right]().MemoryLayout()
 
 	val, err := ConvertFor[Left, Right](left)
 	if err != nil {

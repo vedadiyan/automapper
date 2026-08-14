@@ -3,7 +3,6 @@ package mapper
 import (
 	"fmt"
 	"reflect"
-	"sync"
 )
 
 type (
@@ -14,7 +13,6 @@ type (
 var (
 	converters map[Type]map[Type]Converter
 	pipeline   []Pipeline
-	mut        sync.RWMutex
 )
 
 func init() {
@@ -91,7 +89,7 @@ func SlowConvert(sourceType Type, targetType Type, source Value) (Value, error) 
 	_, leftValue := DeReference(source)
 	targetValue := New(targetType.ConcreteType()).Elem()
 
-	for sourceField := range sourceType.Fields() {
+	for sourceField := range sourceType.ConcreteType().Fields() {
 		if !sourceField.IsExported() {
 			continue
 		}

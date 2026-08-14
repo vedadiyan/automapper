@@ -160,7 +160,7 @@ func typeOf(t reflect.Type) Type {
 		mutx.RUnlock()
 		return val()
 	}
-
+	mutx.RUnlock()
 	mutx.Lock()
 	if val, ok := types[t]; ok {
 		mutx.Unlock()
