@@ -140,12 +140,13 @@ func typeOf(t reflect.Type) Type {
 		return nil
 	}
 
-	mutx.Lock()
+	mutx.RLock()
 	if val, ok := types[t]; ok {
-		mutx.Unlock()
+		mutx.RUnlock()
 		return val()
 	}
 
+	mutx.Lock()
 	types[t] = sync.OnceValue(func() Type {
 		n, ct := DeReferenceType(t)
 		out := &rtype{
