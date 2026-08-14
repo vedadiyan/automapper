@@ -33,9 +33,11 @@ func FastConvert(in Value, o Type) (out Value, err error) {
 			err = fmt.Errorf("%v", r)
 		}
 	}()
+
 	if in.Kind() != reflect.Pointer {
 		in = Reference(1, in)
 	}
+
 	return NewAt(o, in.UnsafePointer()), nil
 }
 
