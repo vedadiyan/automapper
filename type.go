@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"iter"
 	"reflect"
 	"sync"
+	"time"
 )
 
 type (
@@ -71,11 +73,12 @@ type (
 		OverflowUint(x uint64) bool
 		CanSeq() bool
 		CanSeq2() bool
-		MemoryLayout() MemoryLayout
+		MemoryLayout(map[string]Type) MemoryLayout
 		PointerCount() int
 		ConcreteType() Type
 
 		GoType() reflect.Type
+		ID() string
 	}
 
 	MemoryLayout interface {
@@ -85,6 +88,7 @@ type (
 	}
 
 	rtype struct {
+		id        string
 		t         reflect.Type
 		ct        Type
 		ptrCount  int
@@ -147,9 +151,14 @@ func typeOf(t reflect.Type) Type {
 	}
 
 	mutx.Lock()
-	types[t] = sync.OnceValue(func() Type {
+	if val, ok := types[t]; ok {
+		mutx.Unlock()
+		return val()
+	}
+	fn := sync.OnceValue(func() Type {
 		n, ct := DeReferenceType(t)
 		out := &rtype{
+			id:       fmt.Sprintf("%d", time.Now().UnixNano()),
 			t:        t,
 			ptrCount: n,
 		}
@@ -160,8 +169,9 @@ func typeOf(t reflect.Type) Type {
 		}
 		return out
 	})
+	types[t] = fn
 	mutx.Unlock()
-	return types[t]()
+	return fn()
 }
 
 func TypeOf(i any) Type {
@@ -363,8 +373,13 @@ func (rt *rtype) CanSeq2() bool {
 	return rt.t.CanSeq2()
 }
 
-func (rt *rtype) MemoryLayout() MemoryLayout {
+func (rt *rtype) ID() string {
+	return rt.id
+}
+
+func (rt *rtype) MemoryLayout(lt map[string]Type) MemoryLayout {
 	rt.once.Do(func() {
+		lt[rt.id] = rt
 		out := &rmemoryLayout{}
 
 		signature := bytes.NewBuffer(nil)
@@ -378,7 +393,13 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 				signature.WriteByte(byte(reflect.Slice))
 				signature.WriteByte(0x0)
 
-				signature.Write(rt.ConcreteType().Elem().MemoryLayout().Layout())
+				if val, ok := lt[rt.ConcreteType().Elem().ID()]; ok {
+					signature.WriteString(val.ID())
+					signature.WriteByte(0x0)
+					break
+				}
+
+				signature.Write(rt.ConcreteType().Elem().MemoryLayout(lt).Layout())
 				signature.WriteByte(0x0)
 			}
 		case reflect.Array:
@@ -390,7 +411,12 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 				signature.Write(buf[:n])
 				signature.WriteByte(0x0)
 
-				signature.Write(rt.ConcreteType().Elem().MemoryLayout().Layout())
+				if val, ok := lt[rt.ConcreteType().Elem().ID()]; ok {
+					signature.WriteString(val.ID())
+					signature.WriteByte(0x0)
+					break
+				}
+				signature.Write(rt.ConcreteType().Elem().MemoryLayout(lt).Layout())
 				signature.WriteByte(0x0)
 			}
 		case reflect.Map:
@@ -398,11 +424,23 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 				signature.WriteByte(byte(reflect.Map))
 				signature.WriteByte(0x0)
 
-				signature.Write(rt.ConcreteType().Key().MemoryLayout().Layout())
-				signature.WriteByte(0x0)
+				if val, ok := lt[rt.ConcreteType().Key().ID()]; ok {
+					signature.WriteString(val.ID())
+					signature.WriteByte(0x0)
 
-				signature.Write(rt.ConcreteType().Elem().MemoryLayout().Layout())
-				signature.WriteByte(0x0)
+				} else {
+					signature.Write(rt.ConcreteType().Key().MemoryLayout(lt).Layout())
+					signature.WriteByte(0x0)
+				}
+				if val, ok := lt[rt.ConcreteType().Elem().ID()]; ok {
+					signature.WriteString(val.ID())
+					signature.WriteByte(0x0)
+
+				} else {
+
+					signature.Write(rt.ConcreteType().Elem().MemoryLayout(lt).Layout())
+					signature.WriteByte(0x0)
+				}
 			}
 		case reflect.Struct:
 			{
@@ -421,7 +459,14 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 						signature.WriteByte(0x0)
 					}
 
-					signature.Write(f.Type.MemoryLayout().Layout())
+					if val, ok := lt[f.Type.ID()]; ok {
+						signature.WriteString(val.ID())
+						signature.WriteByte(0x0)
+						signature.WriteByte(0x0)
+						continue
+
+					}
+					signature.Write(f.Type.MemoryLayout(lt).Layout())
 					signature.WriteByte(0x0)
 					signature.WriteByte(0x0)
 				}
@@ -438,13 +483,13 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 				signature.WriteByte(0x0)
 
 				for i := range rt.Ins() {
-					signature.Write(i.MemoryLayout().Layout())
+					signature.Write(i.MemoryLayout(lt).Layout())
 					signature.WriteByte(0x0)
 					signature.WriteByte(0x0)
 				}
 
 				for i := range rt.Outs() {
-					signature.Write(i.MemoryLayout().Layout())
+					signature.Write(i.MemoryLayout(lt).Layout())
 					signature.WriteByte(0x0)
 					signature.WriteByte(0x0)
 				}
@@ -467,13 +512,13 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 					signature.WriteByte(0x0)
 
 					for i := range f.Type.Ins() {
-						signature.Write(i.MemoryLayout().Layout())
+						signature.Write(i.MemoryLayout(lt).Layout())
 						signature.WriteByte(0x0)
 						signature.WriteByte(0x0)
 					}
 
 					for i := range f.Type.Outs() {
-						signature.Write(i.MemoryLayout().Layout())
+						signature.Write(i.MemoryLayout(lt).Layout())
 						signature.WriteByte(0x0)
 						signature.WriteByte(0x0)
 					}
