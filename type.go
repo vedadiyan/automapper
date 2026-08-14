@@ -22,7 +22,14 @@ type (
 		Index     []int
 		Anonymous bool
 	}
-	Method reflect.Method
+	Method struct {
+		Name    string
+		PkgPath string
+
+		Type  Type
+		Func  reflect.Value
+		Index int
+	}
 
 	Type interface {
 		Align() int
@@ -115,6 +122,19 @@ func newStructField(t *reflect.StructField) StructField {
 	}
 }
 
+func newMethod(t *reflect.Method) Method {
+	if t == nil {
+		return Method{}
+	}
+
+	return Method{
+		Name:    t.Name,
+		PkgPath: t.PkgPath,
+		Index:   t.Index,
+		Type:    typeOf(t.Type),
+	}
+}
+
 func typeOf(t reflect.Type) Type {
 	if t == nil {
 		return nil
@@ -169,13 +189,14 @@ func (rt *rtype) FieldAlign() int {
 }
 
 func (rt *rtype) Method(i int) Method {
-	return Method(rt.t.Method(i))
+	in := rt.t.Method(i)
+	return newMethod(&in)
 }
 
 func (rt *rtype) Methods() iter.Seq[Method] {
 	return func(yield func(Method) bool) {
 		for method := range rt.t.Methods() {
-			if !yield(Method(method)) {
+			if !yield(newMethod(&method)) {
 				return
 			}
 		}
@@ -184,7 +205,7 @@ func (rt *rtype) Methods() iter.Seq[Method] {
 
 func (rt *rtype) MethodByName(name string) (Method, bool) {
 	out, ok := rt.t.MethodByName(name)
-	return Method(out), ok
+	return newMethod(&out), ok
 }
 
 func (rt *rtype) NumMethod() int {
@@ -388,9 +409,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 				signature.WriteByte(byte(reflect.Slice))
 				signature.WriteByte(0x0)
 
-				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
-				signature.WriteByte(0x0)
-
 				signature.Write(rt.ConcreteType().Elem().ConcreteType().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
 
@@ -414,9 +432,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 				signature.Write(buf[:n])
 				signature.WriteByte(0x0)
 
-				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
-				signature.WriteByte(0x0)
-
 				signature.Write(rt.ConcreteType().Elem().ConcreteType().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
 
@@ -435,16 +450,10 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 				signature.WriteByte(byte(reflect.Map))
 				signature.WriteByte(0x0)
 
-				signature.WriteByte(byte(rt.ConcreteType().Key().PointerCount()))
+				signature.Write(rt.ConcreteType().Key().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
 
-				signature.WriteByte(byte(rt.ConcreteType().Elem().PointerCount()))
-				signature.WriteByte(0x0)
-
-				signature.Write(rt.ConcreteType().Key().ConcreteType().MemoryLayout().Layout())
-				signature.WriteByte(0x0)
-
-				signature.Write(rt.ConcreteType().Elem().ConcreteType().MemoryLayout().Layout())
+				signature.Write(rt.ConcreteType().Elem().MemoryLayout().Layout())
 				signature.WriteByte(0x0)
 
 				bytes := signature.Bytes()
@@ -474,18 +483,81 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 						signature.WriteByte(0x0)
 					}
 
-					n = binary.PutUvarint(buf, uint64(f.Type.ConcreteType().Align()))
+					signature.Write(f.Type.MemoryLayout().Layout())
+					signature.WriteByte(0x0)
+					signature.WriteByte(0x0)
+				}
+				bytes := signature.Bytes()
+				sha256 := sha256.Sum256(bytes)
+				hash := hex.EncodeToString(sha256[:])
+
+				out.layout = bytes
+				out.hash = hash
+
+				rt.signature = out
+			}
+		case reflect.Func:
+			{
+				signature := bytes.NewBuffer(nil)
+				signature.WriteByte(byte(reflect.Func))
+				signature.WriteByte(0x0)
+
+				signature.WriteString(rt.Name())
+				signature.WriteByte(0x0)
+
+				signature.WriteString(rt.PkgPath())
+				signature.WriteByte(0x0)
+
+				for i := range rt.Ins() {
+					signature.Write(i.MemoryLayout().Layout())
+					signature.WriteByte(0x0)
+					signature.WriteByte(0x0)
+				}
+
+				for i := range rt.Outs() {
+					signature.Write(i.MemoryLayout().Layout())
+					signature.WriteByte(0x0)
+					signature.WriteByte(0x0)
+				}
+				bytes := signature.Bytes()
+				sha256 := sha256.Sum256(bytes)
+				hash := hex.EncodeToString(sha256[:])
+
+				out.layout = bytes
+				out.hash = hash
+
+				rt.signature = out
+			}
+		case reflect.Interface:
+			{
+				signature := bytes.NewBuffer(nil)
+				signature.WriteByte(byte(reflect.Interface))
+				signature.WriteByte(0x0)
+
+				for f := range rt.ConcreteType().Methods() {
+					var n int
+					n = binary.PutUvarint(buf, uint64(f.Index))
 					signature.Write(buf[:n])
 					signature.WriteByte(0x0)
 
-					n = binary.PutUvarint(buf, uint64(f.Type.ConcreteType().Size()))
-					signature.Write(buf[:n])
+					signature.WriteString(f.PkgPath)
 					signature.WriteByte(0x0)
 
-					n = binary.PutUvarint(buf, uint64(f.Type.PointerCount()))
-					signature.Write(buf[:n])
+					signature.WriteString(f.Name)
 					signature.WriteByte(0x0)
-					signature.WriteByte(0x0)
+
+					for i := range f.Type.Ins() {
+						signature.Write(i.MemoryLayout().Layout())
+						signature.WriteByte(0x0)
+						signature.WriteByte(0x0)
+					}
+
+					for i := range f.Type.Outs() {
+						signature.Write(i.MemoryLayout().Layout())
+						signature.WriteByte(0x0)
+						signature.WriteByte(0x0)
+					}
+
 				}
 				bytes := signature.Bytes()
 				sha256 := sha256.Sum256(bytes)

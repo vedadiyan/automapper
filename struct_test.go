@@ -29,10 +29,43 @@ type (
 		Shared Shared2
 		Time   **string
 	}
+
+	TI interface {
+		Test() bool
+	}
+
+	T2 interface {
+		A() bool
+	}
+
+	TII struct {
+		xxx string
+	}
+	TIII struct {
+		xxx string
+	}
 )
+
+func (TII) Test() bool {
+	return false
+}
+
+func (TIII) A() bool {
+	return false
+}
 
 func TestConvert(t *testing.T) {
 
+	var intA TI
+
+	intA = &TII{}
+
+	xxxx, err := FastConvertFor[TI, T2](&intA)
+
+	zzzz := *xxxx
+
+	yyyy := zzzz.A()
+	_ = yyyy
 	n := reflect.TypeOf(nil)
 
 	_ = n
