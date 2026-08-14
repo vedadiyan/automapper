@@ -376,32 +376,6 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 
 		signature.WriteByte(byte(rt.PointerCount()))
 		signature.WriteByte(0x0)
-		if rt.ConcreteType().Comparable() {
-			signature.WriteByte(byte(rt.ConcreteType().Kind()))
-			signature.WriteByte(0x0)
-
-			n := binary.PutUvarint(buf, uint64(rt.ConcreteType().Align()))
-			signature.Write(buf[:n])
-			signature.WriteByte(0x0)
-
-			n = binary.PutUvarint(buf, uint64(rt.ConcreteType().Size()))
-			signature.Write(buf[:n])
-			signature.WriteByte(0x0)
-
-			signature.WriteByte(byte(rt.ConcreteType().PointerCount()))
-			signature.WriteByte(0x0)
-
-			bytes := signature.Bytes()
-			sha256 := sha256.Sum256(bytes)
-			hash := hex.EncodeToString(sha256[:])
-
-			out.layout = bytes
-			out.hash = hash
-
-			rt.signature = out
-
-			return
-		}
 		switch rt.ConcreteType().Kind() {
 		case reflect.Slice:
 			{
@@ -567,6 +541,35 @@ func (rt *rtype) MemoryLayout() MemoryLayout {
 				out.hash = hash
 
 				rt.signature = out
+			}
+		default:
+			{
+				if rt.ConcreteType().Comparable() {
+					signature.WriteByte(byte(rt.ConcreteType().Kind()))
+					signature.WriteByte(0x0)
+
+					n := binary.PutUvarint(buf, uint64(rt.ConcreteType().Align()))
+					signature.Write(buf[:n])
+					signature.WriteByte(0x0)
+
+					n = binary.PutUvarint(buf, uint64(rt.ConcreteType().Size()))
+					signature.Write(buf[:n])
+					signature.WriteByte(0x0)
+
+					signature.WriteByte(byte(rt.ConcreteType().PointerCount()))
+					signature.WriteByte(0x0)
+
+					bytes := signature.Bytes()
+					sha256 := sha256.Sum256(bytes)
+					hash := hex.EncodeToString(sha256[:])
+
+					out.layout = bytes
+					out.hash = hash
+
+					rt.signature = out
+
+					return
+				}
 			}
 		}
 
