@@ -36,7 +36,7 @@ func FastConvert(in Value, o Type) (out Value, err error) {
 	}()
 
 	if in.Kind() != reflect.Pointer {
-		in = Reference(1, in)
+		in = in.Reference(1)
 	}
 
 	return NewAt(o, in.UnsafePointer()), nil
@@ -92,7 +92,7 @@ func TryChangeArrayType(sourceField Type, targetField Type, sourceValue Value, t
 		if err != nil {
 			return false, err
 		}
-		targetValue.SetAt(valueOf(reflect.Append(targetValue.GoValue(), Reference(targetField.Elem().PointerCount(), val.Elem()).GoValue())), targetField.PointerCount())
+		targetValue.SetAt(Append(targetValue, val.Elem().Reference(targetField.Elem().PointerCount())), targetField.PointerCount())
 	}
 
 	return true, nil
@@ -153,7 +153,7 @@ func SlowConvert(sourceType Type, targetType Type, source Value) (Value, error) 
 		}
 	}
 
-	ref := Reference(targetType.PointerCount(), targetValue)
+	ref := targetValue.Reference(targetType.PointerCount())
 
 	return ref.Addr(), nil
 }

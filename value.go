@@ -63,6 +63,7 @@ type (
 		OverflowUint(x uint64) bool
 		Pointer() uintptr
 		Recv() (x Value, ok bool)
+		Reference(n int) Value
 		Send(x Value)
 		Set(x Value)
 		SetAt(x Value, n int)
@@ -331,6 +332,10 @@ func (rv rvalue) Recv() (x Value, ok bool) {
 	return valueOf(out), true
 }
 
+func (rv rvalue) Reference(n int) Value {
+	return reference(n, rv)
+}
+
 func (rv rvalue) Send(x Value) {
 	rv.v.Send(x.GoValue())
 }
@@ -340,7 +345,7 @@ func (rv rvalue) Set(x Value) {
 }
 
 func (rv rvalue) SetAt(x Value, n int) {
-	rv.Set(Reference(n, x))
+	rv.Set(reference(n, x))
 }
 
 func (rv rvalue) SetBool(x bool) {
@@ -384,7 +389,7 @@ func (rv rvalue) SetMapIndex(key, elem Value) {
 }
 
 func (rv rvalue) SetMapIndexAt(key Value, kn int, elem Value, vn int) {
-	rv.SetMapIndex(Reference(kn, key), Reference(vn, elem))
+	rv.SetMapIndex(reference(kn, key), reference(vn, elem))
 }
 
 func (rv rvalue) SetPointer(p unsafe.Pointer) {
@@ -475,7 +480,11 @@ func NewAt(t Type, p unsafe.Pointer) Value {
 	return valueOf(reflect.NewAt(t.GoType(), p))
 }
 
-func Reference(n int, v Value) Value {
+func Append(s Value, x Value) Value {
+	return valueOf(reflect.Append(s.GoValue(), x.GoValue()))
+}
+
+func reference(n int, v Value) Value {
 	if n == 0 {
 		return v
 	}
