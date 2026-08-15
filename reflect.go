@@ -3,6 +3,7 @@ package mapper
 import (
 	"fmt"
 	"reflect"
+	"unsafe"
 )
 
 type (
@@ -46,7 +47,7 @@ func TryAssign(sourceField Type, targetField Type, sourceValue Value, targetValu
 		return false, nil
 	}
 
-	targetValue.Set(Reference(targetField.PointerCount(), sourceValue))
+	targetValue.SetAt(sourceValue, targetField.PointerCount())
 
 	return true, nil
 }
@@ -56,7 +57,7 @@ func TryConvert(sourceField Type, targetField Type, sourceValue Value, targetVal
 		return false, nil
 	}
 
-	targetValue.Set(Reference(targetField.PointerCount(), sourceValue.Convert(targetField)))
+	targetValue.SetAt(sourceValue.Convert(targetField), targetField.PointerCount())
 
 	return true, nil
 }
@@ -71,12 +72,11 @@ func TryChangeStructType(sourceField Type, targetField Type, sourceValue Value, 
 		if !ok {
 			continue
 		}
-		_, realValue := DeReference(sourceValue.FieldByIndex(i.Index))
-		val, err := Convert(realValue, target.Type.ConcreteType())
+		val, err := Convert(sourceValue.FieldByIndex(i.Index).ConcreteValue(), target.Type.ConcreteType())
 		if err != nil {
 			return false, err
 		}
-		targetValue.FieldByIndex(target.Index).Set(Reference(target.Type.PointerCount(), val.Elem()))
+		targetValue.FieldByIndex(target.Index).SetAt(val.Elem(), target.Type.PointerCount())
 	}
 
 	return true, nil
@@ -88,12 +88,11 @@ func TryChangeArrayType(sourceField Type, targetField Type, sourceValue Value, t
 	}
 
 	for i := range sourceValue.Len() {
-		_, realValue := DeReference(sourceValue.Index(i))
-		val, err := Convert(realValue, targetField.Elem().ConcreteType())
+		val, err := Convert(sourceValue.Index(i).ConcreteValue(), targetField.Elem().ConcreteType())
 		if err != nil {
 			return false, err
 		}
-		targetValue.Set(Reference(targetField.PointerCount(), valueOf(reflect.Append(targetValue.GoValue(), Reference(targetField.Elem().PointerCount(), val.Elem()).GoValue()))))
+		targetValue.SetAt(valueOf(reflect.Append(targetValue.GoValue(), Reference(targetField.Elem().PointerCount(), val.Elem()).GoValue())), targetField.PointerCount())
 	}
 
 	return true, nil
@@ -113,17 +112,15 @@ func TryChangeMapType(sourceField Type, targetField Type, sourceValue Value, tar
 			targetValue.Set(valueOf(reflect.MakeMap(targetField.GoType())))
 			init = true
 		}
-		_, realKey := DeReference(valueOf(mapRange.Key()))
-		key, err := Convert(realKey, targetField.Key().ConcreteType())
+		key, err := Convert(mapRange.Key().ConcreteValue(), targetField.Key().ConcreteType())
 		if err != nil {
 			return false, err
 		}
-		_, realValue := DeReference(valueOf(mapRange.Value()))
-		value, err := Convert(realValue, targetField.Elem().ConcreteType())
+		value, err := Convert(mapRange.Value().ConcreteValue(), targetField.Elem().ConcreteType())
 		if err != nil {
 			return false, err
 		}
-		targetValue.SetMapIndex(Reference(targetField.Key().PointerCount(), key.Elem()), Reference(targetField.Elem().PointerCount(), value.Elem()))
+		targetValue.SetMapIndexAt(key.Elem(), targetField.Key().PointerCount(), value.Elem(), targetField.Elem().PointerCount())
 	}
 
 	return true, nil
@@ -138,17 +135,16 @@ func TryCustomConvert(sourceField Type, targetField Type, sourceValue Value, tar
 	if err != nil {
 		return false, err
 	}
-	targetValue.Set(Reference(targetField.PointerCount(), val))
+	targetValue.SetAt(val, targetField.PointerCount())
 
 	return true, nil
 }
 
 func SlowConvert(sourceType Type, targetType Type, source Value) (Value, error) {
-	_, leftValue := DeReference(source)
 	targetValue := New(targetType.ConcreteType()).Elem()
 
 	for _, p := range pipeline {
-		ok, err := p(sourceType.ConcreteType(), targetType.ConcreteType(), leftValue, targetValue)
+		ok, err := p(sourceType.ConcreteType(), targetType.ConcreteType(), source.ConcreteValue(), targetValue)
 		if err != nil {
 			return Zero[Value](), err
 		}
@@ -170,4 +166,21 @@ func Convert(source Value, target Type) (Value, error) {
 	}
 
 	return SlowConvert(leftType, target, source)
+}
+
+func FastConvertFor[T any, R any](in *T) (r *R, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+	return (*R)(unsafe.Pointer(in)), nil
+}
+
+func ConvertFor[T any, R any](in *T) (*R, error) {
+	out, err := Convert(ValueOf(in), typeOf(reflect.TypeFor[R]()))
+	if err != nil {
+		return nil, err
+	}
+	return out.Interface().(*R), nil
 }
