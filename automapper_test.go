@@ -15,10 +15,6 @@ import (
 // Test types
 // -----------------------------------------------------------------------------
 
-type testInt int
-type testString string
-type testFloat float64
-
 type sourceBasic struct {
 	Name   string
 	Age    int
@@ -31,16 +27,6 @@ type targetBasic struct {
 	Age    int
 	Active bool
 	Score  float64
-}
-
-type sourceDifferent struct {
-	Name string
-	Age  int
-}
-
-type targetDifferent struct {
-	Name string
-	Age  int64
 }
 
 type sourceNested struct {
@@ -63,16 +49,6 @@ type targetMissingFields struct {
 	Name string
 }
 
-type sourceTagged struct {
-	FirstName string `mapto:"Name"`
-	Age       int
-}
-
-type targetTagged struct {
-	Name string
-	Age  int
-}
-
 type sourceSlice struct {
 	Values []int
 }
@@ -83,10 +59,6 @@ type targetSlice struct {
 
 type sourceArray struct {
 	Values [3]int
-}
-
-type targetArray struct {
-	Values []int64
 }
 
 type sourceMap struct {
@@ -105,44 +77,12 @@ type targetMapKey struct {
 	Values map[string]string
 }
 
-type sourcePointer struct {
-	Value *int
-}
-
-type targetPointer struct {
-	Value **int
-}
-
 type sourceTime struct {
 	Time time.Time
 }
 
 type targetTime struct {
 	Time string
-}
-
-type sourceNil struct {
-	Value *int
-}
-
-type targetNil struct {
-	Value *int
-}
-
-type customSource struct {
-	Value int
-}
-
-type customTarget struct {
-	Value string
-}
-
-type customErrorSource struct {
-	Value int
-}
-
-type customErrorTarget struct {
-	Value string
 }
 
 type namedInt int
@@ -682,7 +622,12 @@ func TestFindConverter_NotFound(t *testing.T) {
 }
 
 func TestFindConverter_Found(t *testing.T) {
-	resetConverters()
+	oldConverters := converters
+	t.Cleanup(func() {
+		converters = oldConverters
+	})
+
+	converters = make(map[Type]map[Type]Converter)
 
 	fn := func(value Value, typ Type) (Value, error) {
 		return ValueOf("ok"), nil
@@ -1187,7 +1132,7 @@ func TestTryCustomConvert_Error(t *testing.T) {
 func TestTryCustomConvert_NotFound(t *testing.T) {
 	resetConverters()
 
-	target := ValueOf(string("")).Elem()
+	target := New(TypeFor[string]()).Elem()
 
 	ok, err := TryCustomConvert(
 		TypeFor[int](),
@@ -1448,12 +1393,17 @@ func TestValueConvert(t *testing.T) {
 
 func TestValueAddr(t *testing.T) {
 	value := 123
-	v := ValueOf(&value)
+
+	v := ValueOf(&value).Elem()
 
 	addr := v.Addr()
 
 	if !addr.IsValid() {
 		t.Fatal("expected valid address")
+	}
+
+	if addr.Elem().Int() != 123 {
+		t.Fatalf("got %d, want 123", addr.Elem().Int())
 	}
 }
 
@@ -1577,7 +1527,7 @@ func TestValueIsNil(t *testing.T) {
 }
 
 func TestValueSet(t *testing.T) {
-	target := ValueOf(int(0)).Elem()
+	target := New(TypeFor[int]()).Elem()
 
 	target.Set(ValueOf(42))
 
@@ -1587,7 +1537,7 @@ func TestValueSet(t *testing.T) {
 }
 
 func TestValueSetInt(t *testing.T) {
-	target := ValueOf(int(0)).Elem()
+	target := New(TypeFor[int]()).Elem()
 
 	target.SetInt(42)
 
@@ -1597,7 +1547,7 @@ func TestValueSetInt(t *testing.T) {
 }
 
 func TestValueSetString(t *testing.T) {
-	target := ValueOf(string("")).Elem()
+	target := New(TypeFor[string]()).Elem()
 
 	target.SetString("hello")
 
@@ -1607,7 +1557,7 @@ func TestValueSetString(t *testing.T) {
 }
 
 func TestValueSetBool(t *testing.T) {
-	target := ValueOf(bool(false)).Elem()
+	target := New(TypeFor[bool]()).Elem()
 
 	target.SetBool(true)
 
@@ -1617,7 +1567,7 @@ func TestValueSetBool(t *testing.T) {
 }
 
 func TestValueSetFloat(t *testing.T) {
-	target := ValueOf(float64(0)).Elem()
+	target := New(TypeFor[float64]()).Elem()
 
 	target.SetFloat(1.5)
 
@@ -1627,7 +1577,7 @@ func TestValueSetFloat(t *testing.T) {
 }
 
 func TestValueSetUint(t *testing.T) {
-	target := ValueOf(uint64(0)).Elem()
+	target := New(TypeFor[uint64]()).Elem()
 
 	target.SetUint(42)
 
@@ -1637,7 +1587,7 @@ func TestValueSetUint(t *testing.T) {
 }
 
 func TestValueSetComplex(t *testing.T) {
-	target := ValueOf(complex128(0)).Elem()
+	target := New(TypeFor[complex128]()).Elem()
 
 	target.SetComplex(complex(1, 2))
 
@@ -1647,7 +1597,8 @@ func TestValueSetComplex(t *testing.T) {
 }
 
 func TestValueSetZero(t *testing.T) {
-	target := ValueOf(int(42)).Elem()
+	i := int(42)
+	target := ValueOf(&i).Elem()
 
 	target.SetZero()
 

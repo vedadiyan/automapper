@@ -39,7 +39,8 @@ func FastConvert(in Value, o Type) (out Value, err error) {
 		in = in.Reference(1)
 	}
 
-	return NewAt(o, in.UnsafePointer()), nil
+	out = NewAt(o.ConcreteType(), in.ConcreteValue().Reference(1).UnsafePointer())
+	return out.Reference(o.PointerCount()).Elem(), nil
 }
 
 func TryAssign(sourceField Type, targetField Type, sourceValue Value, targetValue Value) (bool, error) {
@@ -76,7 +77,7 @@ func TryChangeStructType(sourceField Type, targetField Type, sourceValue Value, 
 		if err != nil {
 			return false, err
 		}
-		targetValue.FieldByIndex(target.Index).SetAt(val.Elem(), target.Type.PointerCount())
+		targetValue.FieldByIndex(target.Index).SetAt(val, target.Type.PointerCount())
 	}
 
 	return true, nil
@@ -99,11 +100,11 @@ func TryChangeArrayType(sourceField Type, targetField Type, sourceValue Value, t
 		switch targetField.ConcreteType().Kind() {
 		case reflect.Array:
 			{
-				targetValue.Index(i).Set(val.Elem().Reference(targetField.Elem().PointerCount()))
+				targetValue.Index(i).Set(val.Reference(targetField.Elem().PointerCount()))
 			}
 		case reflect.Slice:
 			{
-				targetValue.SetAt(Append(targetValue, val.Elem().Reference(targetField.Elem().PointerCount())), targetField.PointerCount())
+				targetValue.SetAt(Append(targetValue, val.Reference(targetField.Elem().PointerCount())), targetField.PointerCount())
 			}
 		}
 
@@ -134,7 +135,7 @@ func TryChangeMapType(sourceField Type, targetField Type, sourceValue Value, tar
 		if err != nil {
 			return false, err
 		}
-		targetValue.SetMapIndexAt(key.Elem(), targetField.Key().PointerCount(), value.Elem(), targetField.Elem().PointerCount())
+		targetValue.SetMapIndexAt(key, targetField.Key().PointerCount(), value, targetField.Elem().PointerCount())
 	}
 
 	return true, nil
@@ -169,7 +170,7 @@ func SlowConvert(sourceType Type, targetType Type, source Value) (Value, error) 
 
 	ref := targetValue.Reference(targetType.PointerCount())
 
-	return ref.Addr(), nil
+	return ref, nil
 }
 func Convert(source Value, target Type) (Value, error) {
 
@@ -192,7 +193,7 @@ func FastConvertFor[T any, R any](in *T) (r *R, err error) {
 }
 
 func ConvertFor[T any, R any](in *T) (*R, error) {
-	out, err := Convert(ValueOf(in), TypeFor[R]())
+	out, err := Convert(ValueOf(in), TypeFor[*R]())
 	if err != nil {
 		return nil, err
 	}

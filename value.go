@@ -115,19 +115,19 @@ func valueOf(r reflect.Value) Value {
 	return out
 }
 
-func (rv rvalue) Addr() Value {
+func (rv *rvalue) Addr() Value {
 	return valueOf(rv.v.Addr())
 }
 
-func (rv rvalue) Bool() bool {
-	return rv.Bool()
+func (rv *rvalue) Bool() bool {
+	return rv.v.Bool()
 }
 
-func (rv rvalue) Bytes() []byte {
-	return rv.Bytes()
+func (rv *rvalue) Bytes() []byte {
+	return rv.v.Bytes()
 }
 
-func (rv rvalue) do(in []Value, fn func([]reflect.Value) []reflect.Value) []Value {
+func (rv *rvalue) do(in []Value, fn func([]reflect.Value) []reflect.Value) []Value {
 	inLen := len(in)
 	ins := make([]reflect.Value, inLen)
 	for i, v := range in {
@@ -142,87 +142,87 @@ func (rv rvalue) do(in []Value, fn func([]reflect.Value) []reflect.Value) []Valu
 	return outs
 }
 
-func (rv rvalue) Call(in []Value) []Value {
+func (rv *rvalue) Call(in []Value) []Value {
 	return rv.do(in, rv.v.Call)
 }
 
-func (rv rvalue) CallSlice(in []Value) []Value {
+func (rv *rvalue) CallSlice(in []Value) []Value {
 	return rv.do(in, rv.v.CallSlice)
 }
 
-func (rv rvalue) CanAddr() bool {
+func (rv *rvalue) CanAddr() bool {
 	return rv.v.CanAddr()
 }
 
-func (rv rvalue) CanComplex() bool {
+func (rv *rvalue) CanComplex() bool {
 	return rv.v.CanComplex()
 }
 
-func (rv rvalue) CanConvert(t Type) bool {
+func (rv *rvalue) CanConvert(t Type) bool {
 	return rv.v.CanConvert(t.GoType())
 }
 
-func (rv rvalue) CanFloat() bool {
+func (rv *rvalue) CanFloat() bool {
 	return rv.v.CanFloat()
 }
 
-func (rv rvalue) CanInt() bool {
+func (rv *rvalue) CanInt() bool {
 	return rv.v.CanInt()
 }
 
-func (rv rvalue) CanInterface() bool {
+func (rv *rvalue) CanInterface() bool {
 	return rv.CanInterface()
 }
 
-func (rv rvalue) CanSet() bool {
+func (rv *rvalue) CanSet() bool {
 	return rv.v.CanSet()
 }
 
-func (rv rvalue) CanUint() bool {
+func (rv *rvalue) CanUint() bool {
 	return rv.v.CanUint()
 }
 
-func (rv rvalue) Cap() int {
+func (rv *rvalue) Cap() int {
 	return rv.v.Cap()
 }
 
-func (rv rvalue) Clear() {
+func (rv *rvalue) Clear() {
 	rv.v.Clear()
 }
 
-func (rv rvalue) Close() {
+func (rv *rvalue) Close() {
 	rv.v.Close()
 }
 
-func (rv rvalue) Comparable() bool {
+func (rv *rvalue) Comparable() bool {
 	return rv.v.Comparable()
 }
 
-func (rv rvalue) Complex() complex128 {
+func (rv *rvalue) Complex() complex128 {
 	return rv.v.Complex()
 }
 
-func (rv rvalue) Convert(t Type) Value {
+func (rv *rvalue) Convert(t Type) Value {
 	return valueOf(rv.v.Convert(t.GoType()))
 }
 
-func (rv rvalue) Elem() Value {
+func (rv *rvalue) Elem() Value {
 	return valueOf(rv.v.Elem())
 }
 
-func (rv rvalue) Equal(u Value) bool {
+func (rv *rvalue) Equal(u Value) bool {
 	return rv.v.Equal(u.GoValue())
 }
 
-func (rv rvalue) Field(i int) Value {
+func (rv *rvalue) Field(i int) Value {
 	return valueOf(rv.v.Field(i))
 }
 
-func (rv rvalue) FieldByIndex(index []int) Value {
+func (rv *rvalue) FieldByIndex(index []int) Value {
 	return valueOf(rv.v.FieldByIndex(index))
 }
 
-func (rv rvalue) FieldByIndexErr(index []int) (Value, error) {
+func (rv *rvalue) FieldByIndexErr(index []int) (Value, error) {
 	out, err := rv.v.FieldByIndexErr(index)
 	if err != nil {
 		return nil, err
@@ -230,51 +230,51 @@ func (rv rvalue) FieldByIndexErr(index []int) (Value, error) {
 	return valueOf(out), nil
 }
 
-func (rv rvalue) FieldByName(name string) Value {
+func (rv *rvalue) FieldByName(name string) Value {
 	return valueOf(rv.v.FieldByName(name))
 }
 
-func (rv rvalue) FieldByNameFunc(match func(string) bool) Value {
+func (rv *rvalue) FieldByNameFunc(match func(string) bool) Value {
 	return valueOf(rv.v.FieldByNameFunc(match))
 }
 
-func (rv rvalue) Float() float64 {
+func (rv *rvalue) Float() float64 {
 	return rv.v.Float()
 }
 
-func (rv rvalue) Index(i int) Value {
+func (rv *rvalue) Index(i int) Value {
 	return valueOf(rv.v.Index(i))
 }
 
-func (rv rvalue) Int() int64 {
+func (rv *rvalue) Int() int64 {
 	return rv.v.Int()
 }
 
-func (rv rvalue) IsNil() bool {
+func (rv *rvalue) IsNil() bool {
 	return rv.v.IsNil()
 }
 
-func (rv rvalue) IsValid() bool {
+func (rv *rvalue) IsValid() bool {
 	return rv.v.IsValid()
 }
 
-func (rv rvalue) IsZero() bool {
+func (rv *rvalue) IsZero() bool {
 	return rv.v.IsZero()
 }
 
-func (rv rvalue) Kind() Kind {
+func (rv *rvalue) Kind() Kind {
 	return rv.v.Kind()
 }
 
-func (rv rvalue) Len() int {
+func (rv *rvalue) Len() int {
 	return rv.v.Len()
 }
 
-func (rv rvalue) MapIndex(key Value) Value {
+func (rv *rvalue) MapIndex(key Value) Value {
 	return valueOf(rv.v.MapIndex(key.GoValue()))
 }
 
-func (rv rvalue) MapKeys() []Value {
+func (rv *rvalue) MapKeys() []Value {
 	out := rv.v.MapKeys()
 	outLen := len(out)
 	outs := make([]Value, outLen)
@@ -284,47 +284,47 @@ func (rv rvalue) MapKeys() []Value {
 	return outs
 }
 
-func (rv rvalue) MapRange() MapIter {
+func (rv *rvalue) MapRange() MapIter {
 	return &rmapIter{rv.v.MapRange()}
 }
 
-func (rv rvalue) Method(i int) Value {
+func (rv *rvalue) Method(i int) Value {
 	return valueOf(rv.v.Method(i))
 }
 
-func (rv rvalue) MethodByName(name string) Value {
+func (rv *rvalue) MethodByName(name string) Value {
 	return valueOf(rv.v.MethodByName(name))
 }
 
-func (rv rvalue) NumField() int {
+func (rv *rvalue) NumField() int {
 	return rv.v.NumField()
 }
 
-func (rv rvalue) NumMethod() int {
+func (rv *rvalue) NumMethod() int {
 	return rv.v.NumMethod()
 }
 
-func (rv rvalue) OverflowComplex(x complex128) bool {
+func (rv *rvalue) OverflowComplex(x complex128) bool {
 	return rv.v.OverflowComplex(x)
 }
 
-func (rv rvalue) OverflowFloat(x float64) bool {
+func (rv *rvalue) OverflowFloat(x float64) bool {
 	return rv.v.OverflowFloat(x)
 }
 
-func (rv rvalue) OverflowInt(x int64) bool {
+func (rv *rvalue) OverflowInt(x int64) bool {
 	return rv.v.OverflowInt(x)
 }
 
-func (rv rvalue) OverflowUint(x uint64) bool {
+func (rv *rvalue) OverflowUint(x uint64) bool {
 	return rv.v.OverflowUint(x)
 }
 
-func (rv rvalue) Pointer() uintptr {
+func (rv *rvalue) Pointer() uintptr {
 	return rv.v.Pointer()
 }
 
-func (rv rvalue) Recv() (x Value, ok bool) {
+func (rv *rvalue) Recv() (x Value, ok bool) {
 	out, ok := rv.v.Recv()
 	if !ok {
 		return nil, false
@@ -332,119 +332,119 @@ func (rv rvalue) Recv() (x Value, ok bool) {
 	return valueOf(out), true
 }
 
-func (rv rvalue) Reference(n int) Value {
+func (rv *rvalue) Reference(n int) Value {
 	return reference(n, rv)
 }
 
-func (rv rvalue) Send(x Value) {
+func (rv *rvalue) Send(x Value) {
 	rv.v.Send(x.GoValue())
 }
 
-func (rv rvalue) Set(x Value) {
+func (rv *rvalue) Set(x Value) {
 	rv.v.Set(x.GoValue())
 }
 
-func (rv rvalue) SetAt(x Value, n int) {
+func (rv *rvalue) SetAt(x Value, n int) {
 	rv.Set(reference(n, x))
 }
 
-func (rv rvalue) SetBool(x bool) {
+func (rv *rvalue) SetBool(x bool) {
 	rv.v.SetBool(x)
 }
 
-func (rv rvalue) SetBytes(x []byte) {
+func (rv *rvalue) SetBytes(x []byte) {
 	rv.v.SetBytes(x)
 }
 
-func (rv rvalue) SetCap(n int) {
+func (rv *rvalue) SetCap(n int) {
 	rv.v.SetCap(n)
 }
 
-func (rv rvalue) SetComplex(x complex128) {
+func (rv *rvalue) SetComplex(x complex128) {
 	rv.v.SetComplex(x)
 }
 
-func (rv rvalue) SetFloat(x float64) {
+func (rv *rvalue) SetFloat(x float64) {
 	rv.v.SetFloat(x)
 }
 
-func (rv rvalue) SetInt(x int64) {
+func (rv *rvalue) SetInt(x int64) {
 	rv.v.SetInt(x)
 }
 
-func (rv rvalue) SetIterKey(iter MapIter) {
+func (rv *rvalue) SetIterKey(iter MapIter) {
 	rv.v.SetIterKey(iter.GoType())
 }
 
-func (rv rvalue) SetIterValue(iter MapIter) {
+func (rv *rvalue) SetIterValue(iter MapIter) {
 	rv.v.SetIterValue(iter.GoType())
 }
 
-func (rv rvalue) SetLen(n int) {
+func (rv *rvalue) SetLen(n int) {
 	rv.v.SetLen(n)
 }
 
-func (rv rvalue) SetMapIndex(key, elem Value) {
+func (rv *rvalue) SetMapIndex(key, elem Value) {
 	rv.v.SetMapIndex(key.GoValue(), elem.GoValue())
 }
 
-func (rv rvalue) SetMapIndexAt(key Value, kn int, elem Value, vn int) {
+func (rv *rvalue) SetMapIndexAt(key Value, kn int, elem Value, vn int) {
 	rv.SetMapIndex(reference(kn, key), reference(vn, elem))
 }
 
-func (rv rvalue) SetPointer(p unsafe.Pointer) {
+func (rv *rvalue) SetPointer(p unsafe.Pointer) {
 	rv.v.SetPointer(p)
 }
 
-func (rv rvalue) SetString(s string) {
+func (rv *rvalue) SetString(s string) {
 	rv.v.SetString(s)
 }
 
-func (rv rvalue) SetUint(x uint64) {
+func (rv *rvalue) SetUint(x uint64) {
 	rv.v.SetUint(x)
 }
 
-func (rv rvalue) SetZero() {
+func (rv *rvalue) SetZero() {
 	rv.v.SetZero()
 }
 
-func (rv rvalue) Slice(i, j int) Value {
+func (rv *rvalue) Slice(i, j int) Value {
 	return valueOf(rv.v.Slice(i, j))
 }
 
-func (rv rvalue) Slice3(i, j, k int) Value {
+func (rv *rvalue) Slice3(i, j, k int) Value {
 	return valueOf(rv.v.Slice3(i, j, k))
 }
 
-func (rv rvalue) String() string {
+func (rv *rvalue) String() string {
 	return rv.v.String()
 }
 
-func (rv rvalue) Type() Type {
+func (rv *rvalue) Type() Type {
 	return typeOf(rv.v.Type())
 }
 
-func (rv rvalue) UnsafePointer() unsafe.Pointer {
+func (rv *rvalue) UnsafePointer() unsafe.Pointer {
 	return rv.v.UnsafePointer()
 }
 
-func (rv rvalue) Uint() uint64 {
+func (rv *rvalue) Uint() uint64 {
 	return rv.v.Uint()
 }
 
-func (rv rvalue) Interface() any {
+func (rv *rvalue) Interface() any {
 	return rv.v.Interface()
 }
 
-func (rv rvalue) GoValue() reflect.Value {
+func (rv *rvalue) GoValue() reflect.Value {
 	return rv.v
 }
 
-func (rv rvalue) ConcreteValue() Value {
+func (rv *rvalue) ConcreteValue() Value {
 	return rv.cv
 }
 
-func (rv rvalue) PointerCount() int {
+func (rv *rvalue) PointerCount() int {
 	return rv.ptrCount
 }
 
