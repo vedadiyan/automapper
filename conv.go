@@ -109,7 +109,7 @@ func TryChangeMapType(sourceField Type, targetField Type, sourceValue Value, tar
 
 	for mapRange.Next() {
 		if !init {
-			targetValue.Set(valueOf(reflect.MakeMap(targetField.GoType())))
+			targetValue.Set(MakeMap(targetField))
 			init = true
 		}
 		key, err := Convert(mapRange.Key().ConcreteValue(), targetField.Key().ConcreteType())

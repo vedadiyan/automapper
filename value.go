@@ -480,6 +480,10 @@ func NewAt(t Type, p unsafe.Pointer) Value {
 	return valueOf(reflect.NewAt(t.GoType(), p))
 }
 
+func MakeMap(t Type) Value {
+	return valueOf(reflect.MakeMap(t.GoType()))
+}
+
 func Append(s Value, x Value) Value {
 	return valueOf(reflect.Append(s.GoValue(), x.GoValue()))
 }
