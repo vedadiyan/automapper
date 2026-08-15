@@ -487,6 +487,9 @@ func MakeMap(t Type) Value {
 func Append(s Value, x Value) Value {
 	return valueOf(reflect.Append(s.GoValue(), x.GoValue()))
 }
+func AppendSlice(s Value, x Value) Value {
+	return valueOf(reflect.AppendSlice(s.GoValue(), x.GoValue()))
+}
 
 func reference(n int, v Value) Value {
 	if n == 0 {

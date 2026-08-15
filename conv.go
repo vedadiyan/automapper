@@ -87,12 +87,26 @@ func TryChangeArrayType(sourceField Type, targetField Type, sourceValue Value, t
 		return false, nil
 	}
 
+	if targetField.ConcreteType().Kind() == reflect.Slice && !sourceValue.ConcreteValue().IsZero() {
+		targetValue.Set(valueOf(reflect.MakeSlice(targetField.GoType(), 0, 0)))
+	}
+
 	for i := range sourceValue.Len() {
 		val, err := Convert(sourceValue.Index(i).ConcreteValue(), targetField.Elem().ConcreteType())
 		if err != nil {
 			return false, err
 		}
-		targetValue.SetAt(Append(targetValue, val.Elem().Reference(targetField.Elem().PointerCount())), targetField.PointerCount())
+		switch targetField.ConcreteType().Kind() {
+		case reflect.Array:
+			{
+				targetValue.Index(i).Set(val.Elem().Reference(targetField.Elem().PointerCount()))
+			}
+		case reflect.Slice:
+			{
+				targetValue.SetAt(Append(targetValue, val.Elem().Reference(targetField.Elem().PointerCount())), targetField.PointerCount())
+			}
+		}
+
 	}
 
 	return true, nil
@@ -178,7 +192,7 @@ func FastConvertFor[T any, R any](in *T) (r *R, err error) {
 }
 
 func ConvertFor[T any, R any](in *T) (*R, error) {
-	out, err := Convert(ValueOf(in), typeOf(reflect.TypeFor[R]()))
+	out, err := Convert(ValueOf(in), TypeFor[R]())
 	if err != nil {
 		return nil, err
 	}
