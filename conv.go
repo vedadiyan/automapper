@@ -78,7 +78,7 @@ func TryChangeStructType(sourceField Type, targetField Type, sourceValue Value, 
 		if err != nil {
 			return false, err
 		}
-		targetValue.FieldByName(target.Name).SetAt(val, target.Type.PointerCount())
+		targetValue.FieldByName(target.Name).SetAt(val.ConcreteValue(), target.Type.PointerCount())
 	}
 
 	return true, nil
@@ -89,16 +89,16 @@ func TryChangeArrayType(sourceField Type, targetField Type, sourceValue Value, t
 		return false, nil
 	}
 
-	if targetField.ConcreteType().Kind() == reflect.Slice && !sourceValue.ConcreteValue().IsZero() {
+	if targetField.Kind() == reflect.Slice && !sourceValue.IsZero() {
 		targetValue.Set(valueOf(reflect.MakeSlice(targetField.GoType(), 0, 0)))
 	}
 
 	for i := range sourceValue.Len() {
-		val, err := Convert(sourceValue.Index(i).ConcreteValue(), targetField.Elem().ConcreteType())
+		val, err := Convert(sourceValue.Index(i), targetField.Elem())
 		if err != nil {
 			return false, err
 		}
-		switch targetField.ConcreteType().Kind() {
+		switch targetField.Kind() {
 		case reflect.Array:
 			{
 				targetValue.Index(i).Set(val.Reference(targetField.Elem().PointerCount()))
