@@ -2,9 +2,8 @@ package mapper
 
 import (
 	"bytes"
-	"crypto/sha512"
 	"encoding/binary"
-	"encoding/hex"
+	"hash/maphash"
 	"iter"
 	"reflect"
 	"sync"
@@ -87,7 +86,7 @@ type (
 
 	MemoryLayout interface {
 		Layout() []byte
-		HashCode() string
+		HashCode() uint64
 		IdenticalTo(MemoryLayout) bool
 	}
 
@@ -106,17 +105,19 @@ type (
 
 	rmemoryLayout struct {
 		layout []byte
-		hash   string
+		hash   uint64
 	}
 )
 
 var (
 	types map[reflect.Type]func() Type
 	mutx  sync.RWMutex
+	seed  maphash.Seed
 )
 
 func init() {
 	types = make(map[reflect.Type]func() Type)
+	seed = maphash.MakeSeed()
 }
 
 func newStructField(t *reflect.StructField) StructField {
@@ -417,19 +418,20 @@ func (rt *rtype) memoryLayout(lt map[string]Type) MemoryLayout {
 
 		signature.WriteByte(byte(rt.PointerCount()))
 		signature.WriteByte(0x0)
-		switch rt.ConcreteType().Kind() {
+		ct := rt.ConcreteType()
+		switch ct.Kind() {
 		case reflect.Slice:
 			{
 				signature.WriteByte(byte(reflect.Slice))
 				signature.WriteByte(0x0)
 
-				if val, ok := lt[rt.ConcreteType().Elem().ID()]; ok {
+				if val, ok := lt[ct.Elem().ID()]; ok {
 					signature.WriteString(val.ID())
 					signature.WriteByte(0x0)
 					break
 				}
 
-				signature.Write(rt.ConcreteType().Elem().memoryLayout(lt).Layout())
+				signature.Write(ct.Elem().memoryLayout(lt).Layout())
 				signature.WriteByte(0x0)
 			}
 		case reflect.Array:
@@ -437,16 +439,16 @@ func (rt *rtype) memoryLayout(lt map[string]Type) MemoryLayout {
 				signature.WriteByte(byte(reflect.Array))
 				signature.WriteByte(0x0)
 
-				n := binary.PutUvarint(buf, uint64(rt.ConcreteType().Len()))
+				n := binary.PutUvarint(buf, uint64(ct.Len()))
 				signature.Write(buf[:n])
 				signature.WriteByte(0x0)
 
-				if val, ok := lt[rt.ConcreteType().Elem().ID()]; ok {
+				if val, ok := lt[ct.Elem().ID()]; ok {
 					signature.WriteString(val.ID())
 					signature.WriteByte(0x0)
 					break
 				}
-				signature.Write(rt.ConcreteType().Elem().memoryLayout(lt).Layout())
+				signature.Write(ct.Elem().memoryLayout(lt).Layout())
 				signature.WriteByte(0x0)
 			}
 		case reflect.Map:
@@ -454,21 +456,21 @@ func (rt *rtype) memoryLayout(lt map[string]Type) MemoryLayout {
 				signature.WriteByte(byte(reflect.Map))
 				signature.WriteByte(0x0)
 
-				if val, ok := lt[rt.ConcreteType().Key().ID()]; ok {
+				if val, ok := lt[ct.Key().ID()]; ok {
 					signature.WriteString(val.ID())
 					signature.WriteByte(0x0)
 
 				} else {
-					signature.Write(rt.ConcreteType().Key().memoryLayout(lt).Layout())
+					signature.Write(ct.Key().memoryLayout(lt).Layout())
 					signature.WriteByte(0x0)
 				}
-				if val, ok := lt[rt.ConcreteType().Elem().ID()]; ok {
+				if val, ok := lt[ct.Elem().ID()]; ok {
 					signature.WriteString(val.ID())
 					signature.WriteByte(0x0)
 
 				} else {
 
-					signature.Write(rt.ConcreteType().Elem().memoryLayout(lt).Layout())
+					signature.Write(ct.Elem().memoryLayout(lt).Layout())
 					signature.WriteByte(0x0)
 				}
 			}
@@ -477,7 +479,8 @@ func (rt *rtype) memoryLayout(lt map[string]Type) MemoryLayout {
 				signature.WriteByte(byte(reflect.Struct))
 				signature.WriteByte(0x0)
 
-				for f := range rt.ConcreteType().Fields() {
+				for i := range ct.NumField() {
+					f := ct.Field(i)
 					var n int
 					n = binary.PutUvarint(buf, uint64(f.Offset))
 					signature.Write(buf[:n])
@@ -545,7 +548,7 @@ func (rt *rtype) memoryLayout(lt map[string]Type) MemoryLayout {
 				signature.WriteByte(byte(reflect.Interface))
 				signature.WriteByte(0x0)
 
-				for f := range rt.ConcreteType().Methods() {
+				for f := range ct.Methods() {
 					var n int
 					n = binary.PutUvarint(buf, uint64(f.Index))
 					signature.Write(buf[:n])
@@ -588,27 +591,27 @@ func (rt *rtype) memoryLayout(lt map[string]Type) MemoryLayout {
 			}
 		default:
 			{
-				signature.WriteByte(byte(rt.ConcreteType().Kind()))
+				signature.WriteByte(byte(ct.Kind()))
 				signature.WriteByte(0x0)
 
-				n := binary.PutUvarint(buf, uint64(rt.ConcreteType().Align()))
+				n := binary.PutUvarint(buf, uint64(ct.Align()))
 				signature.Write(buf[:n])
 				signature.WriteByte(0x0)
 
-				n = binary.PutUvarint(buf, uint64(rt.ConcreteType().Size()))
+				n = binary.PutUvarint(buf, uint64(ct.Size()))
 				signature.Write(buf[:n])
 				signature.WriteByte(0x0)
 
-				signature.WriteByte(byte(rt.ConcreteType().PointerCount()))
+				signature.WriteByte(byte(ct.PointerCount()))
 				signature.WriteByte(0x0)
 			}
 		}
 		bytes := signature.Bytes()
-		sha512 := sha512.Sum512(bytes)
-		hash := hex.EncodeToString(sha512[:])
-
+		var h maphash.Hash
+		h.SetSeed(seed)
+		h.Write(bytes)
 		out.layout = bytes
-		out.hash = hash
+		out.hash = h.Sum64()
 
 		rt.signature = out
 	})
@@ -628,7 +631,7 @@ func (rml *rmemoryLayout) Layout() []byte {
 	return rml.layout
 }
 
-func (rml *rmemoryLayout) HashCode() string {
+func (rml *rmemoryLayout) HashCode() uint64 {
 	return rml.hash
 }
 

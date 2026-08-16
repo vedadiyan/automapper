@@ -530,7 +530,7 @@ func TestMemoryLayout_NonNil(t *testing.T) {
 		t.Fatal("expected non-empty layout")
 	}
 
-	if layout.HashCode() == "" {
+	if layout.HashCode() == 0 {
 		t.Fatal("expected hash")
 	}
 }

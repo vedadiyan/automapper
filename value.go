@@ -96,6 +96,8 @@ type (
 		v        reflect.Value
 		cv       reflect.Value
 		ptrCount int
+		typ      Type
+		concrete Value
 	}
 
 	rmapIter struct {
@@ -418,7 +420,10 @@ func (rv *rvalue) String() string {
 }
 
 func (rv *rvalue) Type() Type {
-	return typeOf(rv.v.Type())
+	if rv.typ == nil {
+		rv.typ = typeOf(rv.v.Type())
+	}
+	return rv.typ
 }
 
 func (rv *rvalue) UnsafePointer() unsafe.Pointer {
@@ -438,7 +443,15 @@ func (rv *rvalue) GoValue() reflect.Value {
 }
 
 func (rv *rvalue) ConcreteValue() Value {
-	return valueOf(rv.cv)
+	if rv.concrete != nil {
+		return rv.concrete
+	}
+	if rv.ptrCount == 0 {
+		rv.concrete = rv
+		return rv
+	}
+	rv.concrete = valueOf(rv.cv)
+	return rv.concrete
 }
 
 func (rv *rvalue) PointerCount() int {
