@@ -68,12 +68,13 @@ func TryChangeStructType(sourceField Type, targetField Type, sourceValue Value, 
 		return false, nil
 	}
 
-	for i := range sourceField.Fields() {
-		target, ok := targetField.FieldByName(i.Name)
+	for i := range sourceField.NumField() {
+		f := sourceField.Field(i)
+		target, ok := targetField.FieldByName(f.Name)
 		if !ok {
 			continue
 		}
-		val, err := Convert(sourceValue.FieldByName(i.Name).ConcreteValue(), target.Type.ConcreteType())
+		val, err := Convert(sourceValue.Field(i), target.Type)
 		if err != nil {
 			return false, err
 		}
