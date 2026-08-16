@@ -12,14 +12,27 @@ func BenchmarkAutomapper_Struct(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		var dst benchTarget
-
 		result, err := ConvertFor[benchSource, benchTarget](&src)
 		if err != nil {
 			b.Fatal(err)
 		}
+		_ = result
 
-		dst = *result
+	}
+}
+
+func BenchmarkCopier_Struct(b *testing.B) {
+	src := benchSourceValue
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		var dst benchTarget
+
+		if err := copier.Copy(&dst, &src); err != nil {
+			b.Fatal(err)
+		}
+
 		_ = dst
 	}
 }

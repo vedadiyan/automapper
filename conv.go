@@ -158,8 +158,11 @@ func TryCustomConvert(sourceField Type, targetField Type, sourceValue Value, tar
 func SlowConvert(sourceType Type, targetType Type, source Value) (Value, error) {
 	targetValue := New(targetType.ConcreteType()).Elem()
 
+	sct := sourceType.ConcreteType()
+	tct := targetType.ConcreteType()
+	scv := source.ConcreteValue()
 	for _, p := range pipeline {
-		ok, err := p(sourceType.ConcreteType(), targetType.ConcreteType(), source.ConcreteValue(), targetValue)
+		ok, err := p(sct, tct, scv, targetValue)
 		if err != nil {
 			return Zero[Value](), err
 		}
