@@ -180,9 +180,9 @@ func Convert(source Value, target Type) (Value, error) {
 
 	leftType := source.Type()
 
-	// if leftType.MemoryLayout().IdenticalTo(target.MemoryLayout()) {
-	// 	return FastConvert(source, target)
-	// }
+	if leftType.MemoryLayout().IdenticalTo(target.MemoryLayout()) {
+		return FastConvert(source, target)
+	}
 
 	return SlowConvert(leftType, target, source)
 }

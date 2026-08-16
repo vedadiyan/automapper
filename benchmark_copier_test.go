@@ -3,6 +3,7 @@ package mapper
 import (
 	"testing"
 
+	"github.com/dranikpg/dto-mapper"
 	"github.com/jinzhu/copier"
 )
 
@@ -30,6 +31,22 @@ func BenchmarkCopier_Struct(b *testing.B) {
 		var dst benchTarget
 
 		if err := copier.Copy(&dst, &src); err != nil {
+			b.Fatal(err)
+		}
+
+		_ = dst
+	}
+}
+
+func BenchmarkDTOMapper_Struct(b *testing.B) {
+	src := benchSourceValue
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		var dst benchTarget
+
+		if err := dto.Map(&dst, &src); err != nil {
 			b.Fatal(err)
 		}
 
