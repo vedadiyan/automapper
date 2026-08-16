@@ -94,10 +94,14 @@ type (
 	rtype struct {
 		id        string
 		t         reflect.Type
-		ct        Type
+		ct        reflect.Type
 		ptrCount  int
 		signature MemoryLayout
 		once      sync.Once
+
+		fieldsOnce   sync.Once
+		fields       []StructField
+		fieldsByName map[string]StructField
 	}
 
 	rmemoryLayout struct {
@@ -172,11 +176,7 @@ func typeOf(t reflect.Type) Type {
 			id:       fmt.Sprintf("%d", counter.Add(1)),
 			t:        t,
 			ptrCount: n,
-		}
-		if n != 0 {
-			out.ct = typeOf(ct)
-		} else {
-			out.ct = out
+			ct:       ct,
 		}
 		return out
 	})
@@ -191,6 +191,19 @@ func TypeOf(i any) Type {
 
 func TypeFor[T any]() Type {
 	return typeOf(reflect.TypeFor[T]())
+}
+
+func (rt *rtype) buildFields() {
+	rt.fieldsOnce.Do(func() {
+		rt.fields = make([]StructField, rt.NumField())
+		rt.fieldsByName = make(map[string]StructField)
+		for i := range rt.NumField() {
+			f := rt.t.Field(i)
+			ref := newStructField(&f)
+			rt.fields[i] = ref
+			rt.fieldsByName[f.Name] = ref
+		}
+	})
 }
 
 func (rt *rtype) GoType() reflect.Type {
@@ -282,15 +295,16 @@ func (rt *rtype) Elem() Type {
 }
 
 func (rt *rtype) Field(i int) StructField {
-	in := rt.t.Field(i)
-	return newStructField(&in)
+	rt.buildFields()
+	return rt.fields[i]
 }
 
 func (rt *rtype) Fields() iter.Seq[StructField] {
+	rt.buildFields()
 	return func(yield func(StructField) bool) {
-		for i := 0; i < rt.t.NumField(); i++ {
-			in := rt.t.Field(i)
-			if !yield(newStructField(&in)) {
+		for i := 0; i < rt.NumField(); i++ {
+			in := rt.fields[i]
+			if !yield(in) {
 				return
 			}
 		}
@@ -303,8 +317,9 @@ func (rt *rtype) FieldByIndex(index []int) StructField {
 }
 
 func (rt *rtype) FieldByName(name string) (StructField, bool) {
-	out, ok := rt.t.FieldByName(name)
-	return newStructField(&out), ok
+	rt.buildFields()
+	val, ok := rt.fieldsByName[name]
+	return val, ok
 }
 
 func (rt *rtype) FieldByNameFunc(match func(string) bool) (StructField, bool) {
@@ -607,7 +622,7 @@ func (rt *rtype) PointerCount() int {
 }
 
 func (rt *rtype) ConcreteType() Type {
-	return rt.ct
+	return typeOf(rt.ct)
 }
 
 func (rml *rmemoryLayout) Layout() []byte {

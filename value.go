@@ -94,7 +94,7 @@ type (
 
 	rvalue struct {
 		v        reflect.Value
-		cv       Value
+		cv       reflect.Value
 		ptrCount int
 	}
 
@@ -108,10 +108,7 @@ func valueOf(r reflect.Value) Value {
 	out := &rvalue{}
 	out.v = r
 	out.ptrCount = n
-	_cv := &rvalue{}
-	_cv.v = cv
-	_cv.cv = _cv
-	out.cv = _cv
+	out.cv = cv
 	return out
 }
 
@@ -171,7 +168,7 @@ func (rv *rvalue) CanInt() bool {
 }
 
 func (rv *rvalue) CanInterface() bool {
-	return rv.CanInterface()
+	return rv.v.CanInterface()
 }
 
 func (rv *rvalue) CanSet() bool {
@@ -441,7 +438,7 @@ func (rv *rvalue) GoValue() reflect.Value {
 }
 
 func (rv *rvalue) ConcreteValue() Value {
-	return rv.cv
+	return valueOf(rv.cv)
 }
 
 func (rv *rvalue) PointerCount() int {

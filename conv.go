@@ -73,11 +73,11 @@ func TryChangeStructType(sourceField Type, targetField Type, sourceValue Value, 
 		if !ok {
 			continue
 		}
-		val, err := Convert(sourceValue.FieldByIndex(i.Index).ConcreteValue(), target.Type.ConcreteType())
+		val, err := Convert(sourceValue.FieldByName(i.Name).ConcreteValue(), target.Type.ConcreteType())
 		if err != nil {
 			return false, err
 		}
-		targetValue.FieldByIndex(target.Index).SetAt(val, target.Type.PointerCount())
+		targetValue.FieldByName(target.Name).SetAt(val, target.Type.PointerCount())
 	}
 
 	return true, nil
@@ -176,9 +176,9 @@ func Convert(source Value, target Type) (Value, error) {
 
 	leftType := source.Type()
 
-	if leftType.MemoryLayout().IdenticalTo(target.MemoryLayout()) {
-		return FastConvert(source, target)
-	}
+	// if leftType.MemoryLayout().IdenticalTo(target.MemoryLayout()) {
+	// 	return FastConvert(source, target)
+	// }
 
 	return SlowConvert(leftType, target, source)
 }
