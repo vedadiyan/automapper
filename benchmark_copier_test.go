@@ -11,8 +11,10 @@ func BenchmarkAutomapper_Struct(b *testing.B) {
 
 	b.ReportAllocs()
 
+	converter := GetConverter[benchSource, benchTarget]()
+
 	for b.Loop() {
-		result, err := ConvertFor[benchSource, benchTarget](&src)
+		result, err := converter(&src)
 		if err != nil {
 			b.Fatal(err)
 		}
