@@ -5,11 +5,11 @@ import (
 	"crypto/sha512"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"iter"
 	"reflect"
 	"sync"
-	"sync/atomic"
+
+	"github.com/google/uuid"
 )
 
 type (
@@ -111,9 +111,8 @@ type (
 )
 
 var (
-	types   map[reflect.Type]func() Type
-	mutx    sync.RWMutex
-	counter atomic.Uint64
+	types map[reflect.Type]func() Type
+	mutx  sync.RWMutex
 )
 
 func init() {
@@ -173,7 +172,7 @@ func typeOf(t reflect.Type) Type {
 	fn := sync.OnceValue(func() Type {
 		n, ct := DeReferenceType(t)
 		out := &rtype{
-			id:       fmt.Sprintf("%d", counter.Add(1)),
+			id:       uuid.New().String(),
 			t:        t,
 			ptrCount: n,
 			ct:       ct,
