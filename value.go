@@ -2,6 +2,7 @@ package mapper
 
 import (
 	"reflect"
+	"sync"
 	"unsafe"
 )
 
@@ -98,6 +99,7 @@ type (
 		ptrCount int
 		typ      Type
 		concrete Value
+		typeOnce sync.Once
 	}
 
 	rmapIter struct {
@@ -420,9 +422,10 @@ func (rv *rvalue) String() string {
 }
 
 func (rv *rvalue) Type() Type {
-	if rv.typ == nil {
+	rv.typeOnce.Do(func() {
 		rv.typ = typeOf(rv.v.Type())
-	}
+	})
+
 	return rv.typ
 }
 

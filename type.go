@@ -101,6 +101,15 @@ type (
 		fieldsOnce   sync.Once
 		fields       []StructField
 		fieldsByName map[string]StructField
+
+		concreteOnce sync.Once
+		concrete     Type
+
+		elemOnce sync.Once
+		elem     Type
+
+		keyOnce sync.Once
+		key     Type
 	}
 
 	rmemoryLayout struct {
@@ -291,7 +300,10 @@ func (rt *rtype) IsVariadic() bool {
 }
 
 func (rt *rtype) Elem() Type {
-	return typeOf(rt.t.Elem())
+	rt.elemOnce.Do(func() {
+		rt.elem = typeOf(rt.t.Elem())
+	})
+	return rt.elem
 }
 
 func (rt *rtype) Field(i int) StructField {
@@ -342,7 +354,10 @@ func (rt *rtype) Ins() iter.Seq[Type] {
 }
 
 func (rt *rtype) Key() Type {
-	return typeOf(rt.t.Key())
+	rt.keyOnce.Do(func() {
+		rt.key = typeOf(rt.t.Key())
+	})
+	return rt.key
 }
 
 func (rt *rtype) Len() int {
@@ -624,7 +639,10 @@ func (rt *rtype) PointerCount() int {
 }
 
 func (rt *rtype) ConcreteType() Type {
-	return typeOf(rt.ct)
+	rt.concreteOnce.Do(func() {
+		rt.concrete = typeOf(rt.ct)
+	})
+	return rt.concrete
 }
 
 func (rml *rmemoryLayout) Layout() []byte {
