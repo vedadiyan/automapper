@@ -6,20 +6,6 @@ import (
 )
 
 type (
-	MapIter interface {
-		Key() Value
-		Value() Value
-		Next() bool
-		Reset(v Value)
-		GoType() *reflect.MapIter
-	}
-	Value interface {
-		ConcreteValue() Value
-		PointerCount() int
-		Reference(n int) Value
-		SetAt(x Value, n int)
-	}
-
 	RValue struct {
 		reflect.Value
 		cv       reflect.Value
