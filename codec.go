@@ -109,17 +109,18 @@ func ArrayCodec(sourceField Type, targetField Type) func(sourceValue RValue, tar
 		})
 	}
 
-	codec := Codec(sourceField.Elem().ConcreteType(), targetField.Elem().ConcreteType())
-
+	targetElem := targetField.Elem()
+	targetType := targetElem.ConcreteType()
+	codec := Codec(sourceField.Elem().ConcreteType(), targetType)
 	out = append(out, func(sourceValue, targetValue RValue) error {
 		for i := range sourceValue.Len() {
-			target := valueOf(New(targetField.Elem().ConcreteType()).Elem())
+			target := valueOf(New(targetType).Elem())
 			src := valueOf(sourceValue.Index(i))
 			err := codec(src, target)
 			if err != nil {
 				return err
 			}
-			targetValue.Index(i).Set(target.Reference(target.PointerCount()).Value)
+			targetValue.Index(i).Set(target.Reference(targetElem.PointerCount()).Value)
 		}
 		return nil
 	})
@@ -147,7 +148,7 @@ func CodecFor[T any, R any]() func(in *T) (*R, error) {
 	src := TypeFor[T]()
 	target := TypeFor[R]()
 
-	fn := Codec(src, target)
+	fn := Codec(src.ConcreteType(), target.ConcreteType())
 	if fn == nil {
 		return nil
 	}
