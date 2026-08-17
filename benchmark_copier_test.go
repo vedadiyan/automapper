@@ -11,7 +11,7 @@ func BenchmarkAutomapper_Struct(b *testing.B) {
 
 	b.ReportAllocs()
 
-	converter := GetConverter[benchSource, benchTarget]()
+	converter := CodecFor[benchSource, benchTarget]()
 
 	for b.Loop() {
 		result, err := converter(&src)

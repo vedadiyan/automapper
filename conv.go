@@ -53,17 +53,6 @@ func TryAssign(sourceField Type, targetField Type, sourceValue RValue, targetVal
 	return true, nil
 }
 
-func CreateAssign(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error {
-	if !sourceField.AssignableTo(targetField) {
-		return nil
-	}
-
-	return func(sourceValue RValue, targetValue RValue) error {
-		targetValue.SetAt(sourceValue, targetField.PointerCount())
-		return nil
-	}
-}
-
 func TryConvert(sourceField Type, targetField Type, sourceValue RValue, targetValue RValue) (bool, error) {
 	if !sourceField.ConvertibleTo(targetField) {
 		return false, nil
@@ -72,16 +61,6 @@ func TryConvert(sourceField Type, targetField Type, sourceValue RValue, targetVa
 	targetValue.SetAt(valueOf(sourceValue.Convert(targetField.GoType())), targetField.PointerCount())
 
 	return true, nil
-}
-
-func CreateConvert(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error {
-	if !sourceField.ConvertibleTo(targetField) {
-		return nil
-	}
-	return func(sourceValue RValue, targetValue RValue) error {
-		targetValue.SetAt(valueOf(sourceValue.Convert(targetField.GoType())), targetField.PointerCount())
-		return nil
-	}
 }
 
 func TryChangeStructType(sourceField Type, targetField Type, sourceValue RValue, targetValue RValue) (bool, error) {
@@ -103,34 +82,6 @@ func TryChangeStructType(sourceField Type, targetField Type, sourceValue RValue,
 	}
 
 	return true, nil
-}
-
-func CreateChangeStructType(sourceField Type, targetField Type) []func(sourceValue RValue, targetValue RValue) error {
-	if sourceField.Kind() != reflect.Struct || targetField.Kind() != reflect.Struct {
-		return nil
-	}
-
-	out := make([]func(sourceValue RValue, targetValue RValue) error, 0)
-
-	for i := range sourceField.NumField() {
-		f := sourceField.Field(i)
-		target, ok := targetField.FieldByName(f.Name)
-		if !ok {
-			continue
-		}
-		ptrCount := target.Type.PointerCount()
-		out = append(out, func(sourceValue RValue, targetValue RValue) error {
-			val, err := Convert(valueOf(sourceValue.Field(i)), target.Type)
-			if err != nil {
-				return err
-			}
-			valueOf(targetValue.FieldByName(target.Name)).SetAt(val.ConcreteValue(), ptrCount)
-			return nil
-		})
-
-	}
-
-	return out
 }
 
 // func TryChangeArrayType(sourceField Type, targetField Type, sourceValue RValue, targetValue RValue) (bool, error) {
@@ -247,28 +198,6 @@ func ConvertFor[T any, R any](in *T) (*R, error) {
 		return nil, err
 	}
 	return out.Interface().(*R), nil
-}
-
-func GetConverter[T any, R any]() func(in *T) (*R, error) {
-	left := TypeFor[T]()
-	right := TypeFor[*R]()
-
-	if left.MemoryLayout().IdenticalTo(right.MemoryLayout()) {
-		return func(in *T) (*R, error) {
-			out, err := FastConvert(ValueOf(in), right)
-			if err != nil {
-				return nil, err
-			}
-			return out.Interface().(*R), nil
-		}
-	}
-	return func(in *T) (*R, error) {
-		out, err := SlowConvert(left, right, ValueOf(in))
-		if err != nil {
-			return nil, err
-		}
-		return out.Interface().(*R), nil
-	}
 }
 
 func FindConverter(l Type, r Type) (Converter, bool) {
