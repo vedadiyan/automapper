@@ -67,17 +67,6 @@ func NewAt(t RType, p unsafe.Pointer) RValue {
 	return valueOf(reflect.NewAt(t.GoType(), p))
 }
 
-func MakeMap(t RType) RValue {
-	return valueOf(reflect.MakeMap(t.GoType()))
-}
-
-func Append(s RValue, x RValue) RValue {
-	return valueOf(reflect.Append(s.Value, x.Value))
-}
-func AppendSlice(s RValue, x RValue) RValue {
-	return valueOf(reflect.AppendSlice(s.Value, x.Value))
-}
-
 func reference(n int, v RValue) RValue {
 	if n == 0 {
 		return v
