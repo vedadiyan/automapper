@@ -9,9 +9,9 @@ import (
 func BenchmarkAutomapper_Struct(b *testing.B) {
 	src := benchSourceValue
 
-	b.ReportAllocs()
-
 	converter := CodecFor[benchSource, benchTarget]()
+
+	b.ReportAllocs()
 
 	for b.Loop() {
 		result, err := converter(&src)
@@ -40,10 +40,12 @@ func BenchmarkCopier_Struct(b *testing.B) {
 func BenchmarkAutomapper_NestedStruct(b *testing.B) {
 	src := benchNestedValue
 
+	converter := CodecFor[benchNestedSource, benchNestedTarget]()
+
 	b.ReportAllocs()
 
 	for b.Loop() {
-		result, err := ConvertFor[benchNestedSource, benchNestedTarget](&src)
+		result, err := converter(&src)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -69,9 +71,9 @@ func BenchmarkCopier_NestedStruct(b *testing.B) {
 func BenchmarkAutomapper_Slice(b *testing.B) {
 	src := benchSliceValue
 
-	b.ReportAllocs()
-
 	converter := CodecFor[benchSliceSource, benchSliceTarget]()
+
+	b.ReportAllocs()
 
 	for b.Loop() {
 		result, err := converter(&src)
@@ -100,10 +102,12 @@ func BenchmarkCopier_Slice(b *testing.B) {
 func BenchmarkAutomapper_Map(b *testing.B) {
 	src := benchMapValue
 
+	converter := CodecFor[benchMapSource, benchMapTarget]()
+
 	b.ReportAllocs()
 
 	for b.Loop() {
-		result, err := ConvertFor[benchMapSource, benchMapTarget](&src)
+		result, err := converter(&src)
 		if err != nil {
 			b.Fatal(err)
 		}

@@ -18,6 +18,7 @@ func init() {
 		ConvertCodec,
 		StructCodec,
 		ArrayCodec,
+		MapCodec,
 	}
 }
 
@@ -98,39 +99,56 @@ func ArrayCodec(sourceField Type, targetField Type) func(sourceValue RValue, tar
 		return nil
 	}
 
-	out := make([]func(sourceValue RValue, targetValue RValue) error, 0)
-
-	if targetField.Kind() == reflect.Slice {
-		out = append(out, func(sourceValue, targetValue RValue) error {
-			if !sourceValue.IsZero() {
-				targetValue.SetAt(valueOf(reflect.MakeSlice(targetField.GoType(), sourceValue.Len(), sourceValue.Cap())), targetValue.PointerCount())
-			}
-			return nil
-		})
-	}
-
 	targetElem := targetField.Elem()
 	targetType := targetElem.ConcreteType()
 	codec := Codec(sourceField.Elem().ConcreteType(), targetType)
-	out = append(out, func(sourceValue, targetValue RValue) error {
+	n := targetElem.PointerCount()
+
+	return func(sourceValue, targetValue RValue) error {
+		if targetField.Kind() == reflect.Slice {
+			if !sourceValue.IsZero() {
+				targetValue.SetAt(valueOf(reflect.MakeSlice(targetField.GoType(), sourceValue.Len(), sourceValue.Cap())), targetValue.PointerCount())
+			}
+		}
 		targetValue = targetValue.Refresh().ConcreteValue()
 		for i := range sourceValue.Len() {
-			target := valueOf(New(targetType).Elem())
+			target := valueOf(reflect.New(targetType.GoType()).Elem())
 			src := valueOf(sourceValue.Index(i))
 			err := codec(src, target)
 			if err != nil {
 				return err
 			}
-			targetValue.Index(i).Set(target.Reference(targetElem.PointerCount()).Value)
+			targetValue.Index(i).Set(target.Reference(n).Value)
 		}
 		return nil
-	})
+	}
+}
+
+func MapCodec(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error {
+	if sourceField.Kind() != reflect.Map || targetField.Kind() != reflect.Map {
+		return nil
+	}
+
+	keyType := targetField.Key().ConcreteType()
+	valueType := targetField.Elem().ConcreteType()
+
+	keyN := targetField.Key().PointerCount()
+	valueN := targetField.Elem().PointerCount()
 
 	return func(sourceValue, targetValue RValue) error {
-		for _, o := range out {
-			if err := o(sourceValue, targetValue); err != nil {
+		mapRange := sourceValue.MapRange()
+		targetValue.Set(reflect.MakeMap(targetField.GoType()))
+
+		for mapRange.Next() {
+			key, err := Convert(valueOf(mapRange.Key()).ConcreteValue(), keyType.ConcreteType())
+			if err != nil {
 				return err
 			}
+			value, err := Convert(valueOf(mapRange.Value()).ConcreteValue(), valueType.ConcreteType())
+			if err != nil {
+				return err
+			}
+			targetValue.SetMapIndex(key.Reference(keyN).Value, value.Reference(valueN).Value)
 		}
 		return nil
 	}
