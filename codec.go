@@ -135,17 +135,21 @@ func MapCodec(sourceField Type, targetField Type) func(sourceValue RValue, targe
 	keyN := targetField.Key().PointerCount()
 	valueN := targetField.Elem().PointerCount()
 
+	keyCodec := Codec(sourceField.Key().ConcreteType(), targetField.ConcreteType().Key())
+	valueCodec := Codec(sourceField.Elem().ConcreteType(), targetField.Elem().ConcreteType())
+
 	return func(sourceValue, targetValue RValue) error {
 		mapRange := sourceValue.MapRange()
 		targetValue.Set(reflect.MakeMap(targetField.GoType()))
 
 		for mapRange.Next() {
-			key, err := Convert(valueOf(mapRange.Key()).ConcreteValue(), keyType.ConcreteType())
-			if err != nil {
+			key := valueOf(New(keyType).Elem())
+			if err := keyCodec(valueOf(mapRange.Key()).ConcreteValue(), key); err != nil {
 				return err
 			}
-			value, err := Convert(valueOf(mapRange.Value()).ConcreteValue(), valueType.ConcreteType())
-			if err != nil {
+			value := valueOf(New(valueType).Elem())
+			if err := valueCodec(valueOf(mapRange.Value()).ConcreteValue(), value); err != nil {
+
 				return err
 			}
 			targetValue.SetMapIndex(key.Reference(keyN).Value, value.Reference(valueN).Value)
