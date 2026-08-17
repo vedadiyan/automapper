@@ -5,7 +5,7 @@ import (
 )
 
 type (
-	CodecFn func(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error
+	CodecFn func(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error
 )
 
 var (
@@ -22,7 +22,7 @@ func init() {
 	}
 }
 
-func FastConvertCodec(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error {
+func FastConvertCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
 	outType := targetField.ConcreteType()
 	return func(sourceValue RValue, targetValue RValue) error {
 		if sourceValue.Kind() != reflect.Pointer {
@@ -34,7 +34,7 @@ func FastConvertCodec(sourceField Type, targetField Type) func(sourceValue RValu
 	}
 }
 
-func AssignCodec(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error {
+func AssignCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
 	if !sourceField.AssignableTo(targetField) {
 		return nil
 	}
@@ -45,7 +45,7 @@ func AssignCodec(sourceField Type, targetField Type) func(sourceValue RValue, ta
 	}
 }
 
-func ConvertCodec(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error {
+func ConvertCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
 	if !sourceField.ConvertibleTo(targetField) {
 		return nil
 	}
@@ -56,7 +56,7 @@ func ConvertCodec(sourceField Type, targetField Type) func(sourceValue RValue, t
 	}
 }
 
-func StructCodec(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error {
+func StructCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
 	if sourceField.Kind() != reflect.Struct || targetField.Kind() != reflect.Struct {
 		return nil
 	}
@@ -69,7 +69,7 @@ func StructCodec(sourceField Type, targetField Type) func(sourceValue RValue, ta
 		if !ok {
 			continue
 		}
-		codec := Codec(f.Type.ConcreteType(), target.Type.ConcreteType())
+		codec := Codec(typeOf(f.Type).ConcreteType(), typeOf(target.Type).ConcreteType())
 
 		if codec == nil {
 			continue
@@ -94,14 +94,14 @@ func StructCodec(sourceField Type, targetField Type) func(sourceValue RValue, ta
 	}
 }
 
-func ArrayCodec(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error {
+func ArrayCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
 	if (sourceField.Kind() != reflect.Slice && sourceField.Kind() != reflect.Array) || (targetField.Kind() != reflect.Slice && targetField.Kind() != reflect.Array) {
 		return nil
 	}
 
-	targetElem := targetField.Elem()
+	targetElem := typeOf(targetField.Elem())
 	targetType := targetElem.ConcreteType()
-	codec := Codec(sourceField.Elem().ConcreteType(), targetType)
+	codec := Codec(typeOf(sourceField.Elem()).ConcreteType(), targetType)
 	n := targetElem.PointerCount()
 
 	return func(sourceValue, targetValue RValue) error {
@@ -124,19 +124,25 @@ func ArrayCodec(sourceField Type, targetField Type) func(sourceValue RValue, tar
 	}
 }
 
-func MapCodec(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error {
+func MapCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
 	if sourceField.Kind() != reflect.Map || targetField.Kind() != reflect.Map {
 		return nil
 	}
 
-	keyType := targetField.Key().ConcreteType()
-	valueType := targetField.Elem().ConcreteType()
+	targetKeyRawType := typeOf(targetField.Key())
+	targetValueRawType := typeOf(targetField.Elem())
 
-	keyN := targetField.Key().PointerCount()
-	valueN := targetField.Elem().PointerCount()
+	sourceKeyRawType := typeOf(sourceField.Key())
+	sourceValueRawType := typeOf(sourceField.Elem())
 
-	keyCodec := Codec(sourceField.Key().ConcreteType(), targetField.ConcreteType().Key())
-	valueCodec := Codec(sourceField.Elem().ConcreteType(), targetField.Elem().ConcreteType())
+	keyType := targetKeyRawType.ConcreteType()
+	valueType := targetValueRawType.ConcreteType()
+
+	keyN := targetKeyRawType.PointerCount()
+	valueN := targetValueRawType.PointerCount()
+
+	keyCodec := Codec(sourceKeyRawType.ConcreteType(), keyType.ConcreteType())
+	valueCodec := Codec(sourceValueRawType.ConcreteType(), valueType.ConcreteType())
 
 	return func(sourceValue, targetValue RValue) error {
 		mapRange := sourceValue.MapRange()
@@ -158,7 +164,7 @@ func MapCodec(sourceField Type, targetField Type) func(sourceValue RValue, targe
 	}
 }
 
-func Codec(src Type, target Type) func(sourceValue RValue, targetValue RValue) error {
+func Codec(src RType, target RType) func(sourceValue RValue, targetValue RValue) error {
 	for _, p := range codecs {
 		if fn := p(src, target); fn != nil {
 			return fn

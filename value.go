@@ -51,11 +51,11 @@ func (rv RValue) Refresh() RValue {
 	return valueOf(rv.Value)
 }
 
-func (rv *RValue) PointerCount() int {
+func (rv RValue) PointerCount() int {
 	return rv.ptrCount
 }
 
-func New(t Type) RValue {
+func New(t RType) RValue {
 	return valueOf(reflect.New(t.GoType()))
 }
 
@@ -63,11 +63,11 @@ func ValueOf(i any) RValue {
 	return valueOf(reflect.ValueOf(i))
 }
 
-func NewAt(t Type, p unsafe.Pointer) RValue {
+func NewAt(t RType, p unsafe.Pointer) RValue {
 	return valueOf(reflect.NewAt(t.GoType(), p))
 }
 
-func MakeMap(t Type) RValue {
+func MakeMap(t RType) RValue {
 	return valueOf(reflect.MakeMap(t.GoType()))
 }
 
