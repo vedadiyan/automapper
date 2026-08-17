@@ -112,19 +112,18 @@ func Codec(src Type, target Type) func(sourceValue RValue, targetValue RValue) e
 }
 
 func CodecFor[T any, R any]() func(in *T) (*R, error) {
-	left := TypeFor[T]()
-	right := TypeFor[R]()
+	src := TypeFor[T]()
+	target := TypeFor[R]()
 
-	fn := Codec(left, right)
+	fn := Codec(src, target)
 	if fn == nil {
 		return nil
 	}
 	return func(in *T) (*R, error) {
-		targetValue := valueOf(New(right).Elem())
-		if err := fn(ValueOf(in).ConcreteValue(), targetValue); err != nil {
+		targetValue := New(target.ConcreteType())
+		if err := fn(ValueOf(in).ConcreteValue(), targetValue.ConcreteValue()); err != nil {
 			return nil, err
 		}
-		out := targetValue.Interface().(R)
-		return &out, nil
+		return targetValue.Reference(target.PointerCount()).Interface().(*R), nil
 	}
 }

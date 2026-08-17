@@ -7,11 +7,11 @@ import (
 )
 
 func BenchmarkAutomapper_Struct(b *testing.B) {
-	src := benchSourceValue
+	src := &benchSourceValue
 
 	b.ReportAllocs()
 
-	converter := CodecFor[benchSource, benchTarget]()
+	converter := CodecFor[*benchSource, benchTarget]()
 
 	for b.Loop() {
 		result, err := converter(&src)
