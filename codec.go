@@ -68,7 +68,7 @@ func StructCodec(sourceField Type, targetField Type) func(sourceValue RValue, ta
 		if !ok {
 			continue
 		}
-		codec := Codec(f.Type, target.Type)
+		codec := Codec(f.Type.ConcreteType(), target.Type.ConcreteType())
 
 		if codec == nil {
 			continue
@@ -113,6 +113,7 @@ func ArrayCodec(sourceField Type, targetField Type) func(sourceValue RValue, tar
 	targetType := targetElem.ConcreteType()
 	codec := Codec(sourceField.Elem().ConcreteType(), targetType)
 	out = append(out, func(sourceValue, targetValue RValue) error {
+		targetValue = targetValue.Refresh().ConcreteValue()
 		for i := range sourceValue.Len() {
 			target := valueOf(New(targetType).Elem())
 			src := valueOf(sourceValue.Index(i))

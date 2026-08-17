@@ -47,6 +47,9 @@ func (rv RValue) SetAt(x RValue, n int) {
 func (rv RValue) ConcreteValue() RValue {
 	return valueOf(rv.cv)
 }
+func (rv RValue) Refresh() RValue {
+	return valueOf(rv.Value)
+}
 
 func (rv *RValue) PointerCount() int {
 	return rv.ptrCount
