@@ -1,6 +1,8 @@
 package mapper
 
-import "reflect"
+import (
+	"reflect"
+)
 
 type (
 	CodecFn func(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error
@@ -15,6 +17,18 @@ func init() {
 		AssignCodec,
 		ConvertCodec,
 		StructCodec,
+	}
+}
+
+func FastConvertCodec(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error {
+	outType := targetField.ConcreteType()
+	return func(sourceValue RValue, targetValue RValue) error {
+		if sourceValue.Kind() != reflect.Pointer {
+			sourceValue = sourceValue.Reference(1)
+		}
+		out := NewAt(outType, sourceValue.ConcreteValue().Reference(1).UnsafePointer())
+		targetValue.SetAt(out.ConcreteValue(), targetValue.ptrCount)
+		return nil
 	}
 }
 
@@ -91,9 +105,9 @@ func SlowConvertCodec(src Type, target Type) func(sourceValue RValue, targetValu
 	return nil
 }
 func Codec(src Type, target Type) func(sourceValue RValue, targetValue RValue) error {
-	if src.MemoryLayout().IdenticalTo(target.MemoryLayout()) {
-		return nil
-	}
+	// if src.MemoryLayout().IdenticalTo(target.MemoryLayout()) {
+	// 	return FastConvertCodec(src, target)
+	// }
 	return SlowConvertCodec(src, target)
 }
 
