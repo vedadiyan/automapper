@@ -17,6 +17,7 @@ func init() {
 		AssignCodec,
 		ConvertCodec,
 		StructCodec,
+		ArrayCodec,
 	}
 }
 
@@ -92,23 +93,54 @@ func StructCodec(sourceField Type, targetField Type) func(sourceValue RValue, ta
 	}
 }
 
-func SlowConvertCodec(src Type, target Type) func(sourceValue RValue, targetValue RValue) error {
-	sct := src.ConcreteType()
-	tct := target.ConcreteType()
+func ArrayCodec(sourceField Type, targetField Type) func(sourceValue RValue, targetValue RValue) error {
+	if (sourceField.Kind() != reflect.Slice && sourceField.Kind() != reflect.Array) || (targetField.Kind() != reflect.Slice && targetField.Kind() != reflect.Array) {
+		return nil
+	}
 
+	out := make([]func(sourceValue RValue, targetValue RValue) error, 0)
+
+	if targetField.Kind() == reflect.Slice {
+		out = append(out, func(sourceValue, targetValue RValue) error {
+			if !sourceValue.IsZero() {
+				targetValue.SetAt(valueOf(reflect.MakeSlice(targetField.GoType(), sourceValue.Len(), sourceValue.Cap())), targetValue.PointerCount())
+			}
+			return nil
+		})
+	}
+
+	codec := Codec(sourceField.Elem().ConcreteType(), targetField.Elem().ConcreteType())
+
+	out = append(out, func(sourceValue, targetValue RValue) error {
+		for i := range sourceValue.Len() {
+			target := valueOf(New(targetField.Elem().ConcreteType()).Elem())
+			src := valueOf(sourceValue.Index(i))
+			err := codec(src, target)
+			if err != nil {
+				return err
+			}
+			targetValue.Index(i).Set(target.Reference(target.PointerCount()).Value)
+		}
+		return nil
+	})
+
+	return func(sourceValue, targetValue RValue) error {
+		for _, o := range out {
+			if err := o(sourceValue, targetValue); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
+func Codec(src Type, target Type) func(sourceValue RValue, targetValue RValue) error {
 	for _, p := range codecs {
-		if fn := p(sct, tct); fn != nil {
+		if fn := p(src, target); fn != nil {
 			return fn
 		}
-
 	}
 	return nil
-}
-func Codec(src Type, target Type) func(sourceValue RValue, targetValue RValue) error {
-	// if src.MemoryLayout().IdenticalTo(target.MemoryLayout()) {
-	// 	return FastConvertCodec(src, target)
-	// }
-	return SlowConvertCodec(src, target)
 }
 
 func CodecFor[T any, R any]() func(in *T) (*R, error) {

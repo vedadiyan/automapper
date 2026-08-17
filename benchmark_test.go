@@ -35,7 +35,7 @@ type benchSliceSource struct {
 }
 
 type benchSliceTarget struct {
-	Values *[]*int64
+	Values []int64
 }
 
 type benchMapSource struct {
