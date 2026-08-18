@@ -1,4 +1,4 @@
-package mapper
+package automapper
 
 import (
 	"reflect"
