@@ -528,6 +528,28 @@ or a custom codec when explicit transformation logic is required.
 
 Automapper does not attempt to perform arbitrary business-logic transformations automatically. It focuses on structural and type-compatible mapping.
 
+## Cycle Loops
+
+Automapper does not support cyclic type definitions.
+
+If the target type contains a cycle, `CreateCodecFor` detects it and returns a codec that reports an error when used:
+
+~~~go
+type Node struct {
+	Value int
+	Next  *Node
+}
+
+codec := mapper.CreateCodecFor[Node, Node]()
+
+_, err := codec(&Node{Value: 1})
+// err: cycle loop detected
+~~~
+
+Cycle loops are intentionally rejected to prevent infinite recursive codec construction and mapping.
+
+Automapper supports recursive/nested structures only when the type graph is acyclic.
+
 ## Design Goals
 
 Automapper is designed around a few principles:
