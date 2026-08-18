@@ -28,7 +28,11 @@ func init() {
 }
 
 func CustomCodec(sourceField RType, targetField RType) Codec {
-	for _, codec := range *customCodecs.Load() {
+	codecs := customCodecs.Load()
+	if codecs == nil {
+		return nil
+	}
+	for _, codec := range *codecs {
 		if fn := codec(sourceField, targetField); fn != nil {
 			return fn
 		}
@@ -67,12 +71,18 @@ func StructCodec(sourceField RType, targetField RType) Codec {
 
 	for i := range sourceField.NumField() {
 		f := sourceField.Field(i)
+		if !f.IsExported() {
+			continue
+		}
 		tag, ignore := parseTag(f.Name, f.Tag.Get("mapper"))
 		if ignore {
 			continue
 		}
 		target, ok := targetField.FieldByName(tag)
 		if !ok {
+			continue
+		}
+		if !target.IsExported() {
 			continue
 		}
 		codec := CreateCodec(typeOf(f.Type).ConcreteType(), typeOf(target.Type).ConcreteType())
