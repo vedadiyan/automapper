@@ -2,6 +2,7 @@ package mapper
 
 import (
 	"reflect"
+	"sync/atomic"
 )
 
 type (
@@ -11,7 +12,7 @@ type (
 
 var (
 	codecs       []CodecFactory
-	customCodecs []CodecFactory
+	customCodecs atomic.Pointer[[]CodecFactory]
 )
 
 func init() {
@@ -23,10 +24,11 @@ func init() {
 		ArrayCodec,
 		MapCodec,
 	}
+	customCodecs.Store(&[]CodecFactory{})
 }
 
 func CustomCodec(sourceField RType, targetField RType) Codec {
-	for _, codec := range customCodecs {
+	for _, codec := range *customCodecs.Load() {
 		if fn := codec(sourceField, targetField); fn != nil {
 			return fn
 		}
@@ -77,11 +79,7 @@ func StructCodec(sourceField RType, targetField RType) Codec {
 		sourceIndex := i
 		targetIndex := target.Index
 		out = append(out, func(sourceValue RValue, targetValue RValue) error {
-			err := codec(valueOf(sourceValue.Field(sourceIndex)), valueOf(targetValue.FieldByIndex(targetIndex)))
-			if err != nil {
-				return err
-			}
-			return nil
+			return codec(valueOf(sourceValue.Field(sourceIndex)), valueOf(targetValue.FieldByIndex(targetIndex)))
 		})
 
 	}
@@ -200,10 +198,10 @@ func CreateCodecFor[T any, R any]() func(in *T) (*R, error) {
 	}
 }
 
-func AddCustomCodec[T any, R any](codec func(RValue) (RValue, error)) {
+func CreateCustomCodec[T any, R any](codec func(RValue) (RValue, error)) CodecFactory {
 	src := TypeFor[T]()
 	tgt := TypeFor[R]()
-	fn := func(sourceField RType, targetField RType) Codec {
+	return func(sourceField RType, targetField RType) Codec {
 		if sourceField.ConcreteType() != src.ConcreteType() || targetField.ConcreteType() != tgt.ConcreteType() {
 			return nil
 		}
@@ -216,5 +214,9 @@ func AddCustomCodec[T any, R any](codec func(RValue) (RValue, error)) {
 			return nil
 		}
 	}
-	customCodecs = append(customCodecs, fn)
+}
+
+func SetCustomCodecs(codecs []CodecFactory) {
+	copied := append([]CodecFactory(nil), codecs...)
+	customCodecs.Store(&copied)
 }

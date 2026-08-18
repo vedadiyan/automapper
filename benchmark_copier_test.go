@@ -9,8 +9,10 @@ import (
 func BenchmarkAutomapper_Struct(b *testing.B) {
 	src := benchSourceValue
 
-	AddCustomCodec[int, int64](func(i RValue) (RValue, error) {
-		return ValueOf(int64(0)), nil
+	SetCustomCodecs([]CodecFactory{
+		CreateCustomCodec[int, int64](func(i RValue) (RValue, error) {
+			return ValueOf(int64(0)), nil
+		}),
 	})
 	converter := CreateCodecFor[benchSource, benchTarget]()
 
