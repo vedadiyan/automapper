@@ -110,12 +110,12 @@ func ArrayCodec(sourceField RType, targetField RType) func(sourceValue RValue, t
 	return func(sourceValue, targetValue RValue) error {
 		if targetField.Kind() == reflect.Slice {
 			if !sourceValue.IsZero() {
-				targetValue.SetAt(valueOf(reflect.MakeSlice(targetField.GoType(), sourceValue.Len(), sourceValue.Cap())), targetValue.PointerCount())
+				targetValue.SetAt(valueOf(reflect.MakeSlice(targetField.GoType(), sourceValue.Len(), sourceValue.Len())), targetValue.PointerCount())
 			}
 		}
+		target := valueOf(reflect.New(targetType.GoType()).Elem())
 		targetValue = targetValue.Refresh().ConcreteValue()
 		for i := range sourceValue.Len() {
-			target := valueOf(reflect.New(targetType.GoType()).Elem())
 			src := valueOf(sourceValue.Index(i))
 			err := codec(src, target)
 			if err != nil {
@@ -155,14 +155,13 @@ func MapCodec(sourceField RType, targetField RType) func(sourceValue RValue, tar
 
 	return func(sourceValue, targetValue RValue) error {
 		mapRange := sourceValue.MapRange()
-		targetValue.Set(reflect.MakeMap(targetField.GoType()))
-
+		targetValue.Set(reflect.MakeMapWithSize(targetField.GoType(), sourceValue.Len()))
+		key := valueOf(New(keyType).Elem())
+		value := valueOf(New(valueType).Elem())
 		for mapRange.Next() {
-			key := valueOf(New(keyType).Elem())
 			if err := keyCodec(valueOf(mapRange.Key()).ConcreteValue(), key); err != nil {
 				return err
 			}
-			value := valueOf(New(valueType).Elem())
 			if err := valueCodec(valueOf(mapRange.Value()).ConcreteValue(), value); err != nil {
 
 				return err
