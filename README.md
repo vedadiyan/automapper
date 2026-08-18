@@ -2,13 +2,15 @@
 
 Fast, reflection-based object mapper for Go.
 
-Automapper maps values between different Go types using pre-built codecs. It supports structs, slices, arrays, maps, pointers, type conversions, and custom codecs.
+Automapper maps values between different Go types using pre-built codecs. It supports structs, slices, arrays, maps, pointers, type conversions, field renaming, ignored fields, and custom codecs.
 
 ## Features
 
 - Fast runtime mapping
 - Codec-based architecture
 - Automatic struct field mapping by field name
+- Struct field renaming with `mapper` tags
+- Struct field ignoring with `mapper:"-"`
 - Nested struct mapping
 - Assignable type support
 - Convertible type support
@@ -133,6 +135,69 @@ type Target struct {
 	User UserDTO
 }
 ~~~
+
+## Struct Tags
+
+Automapper supports the `mapper` struct tag for renaming and ignoring fields.
+
+### Rename a Field
+
+Use the target field name as the tag value:
+
+~~~go
+type Source struct {
+	UserID int `mapper:"ID"`
+	Name   string
+}
+
+type Target struct {
+	ID   int
+	Name string
+}
+~~~
+
+`UserID` is mapped to `ID`.
+
+### Ignore a Field
+
+Use `mapper:"-"`:
+
+~~~go
+type Source struct {
+	ID     int
+	Name   string
+	Secret string `mapper:"-"`
+}
+
+type Target struct {
+	ID   int
+	Name string
+}
+~~~
+
+`Secret` is skipped during codec creation.
+
+### No Tag
+
+Without a tag, the field name is used:
+
+~~~go
+type Source struct {
+	ID   int
+	Name string
+}
+~~~
+
+This is equivalent to:
+
+~~~go
+type Source struct {
+	ID   int    `mapper:"ID"`
+	Name string `mapper:"Name"`
+}
+~~~
+
+The tag only affects the source field. The target field itself does not require a tag.
 
 ## Type Conversion
 
@@ -288,7 +353,6 @@ func CustomCodec(sourceField RType, targetField RType) Codec {
 	return nil
 }
 ~~~
-
 Replacing the custom codec configuration is atomic, making concurrent codec creation and mapping safe.
 
 `SetCustomCodecs` uses replace-all semantics rather than add/remove semantics.
@@ -299,6 +363,10 @@ For performance-sensitive code, create the codec once and reuse it:
 
 ~~~go
 codec := mapper.CreateCodecFor[Source, Target]()
+if codec == nil {
+	// No compatible mapping exists.
+	return
+}
 
 for i := range sources {
 	target, err := codec(&sources[i])
@@ -427,12 +495,12 @@ This makes adding new mapping strategies straightforward.
 | Nested collections | Nested collections | Yes |
 | Map keys | Mappable keys | Yes |
 | Map values | Mappable values | Yes |
+| Field rename | `mapper:"FieldName"` | Yes |
+| Field ignore | `mapper:"-"` | Yes |
 
 ## Limitations
 
-Automapper matches struct fields by name.
-
-It does not infer semantic relationships between differently named fields.
+Automapper matches struct fields by name unless a `mapper` tag specifies another source field name.
 
 For example:
 
@@ -448,9 +516,17 @@ type Target struct {
 
 `UserID` will not automatically map to `ID`.
 
-Use a custom codec when explicit transformation logic is required.
+Use:
 
-Automapper also does not attempt to perform arbitrary business-logic transformations automatically. It focuses on structural and type-compatible mapping.
+~~~go
+type Source struct {
+	UserID int `mapper:"ID"`
+}
+~~~
+
+or a custom codec when explicit transformation logic is required.
+
+Automapper does not attempt to perform arbitrary business-logic transformations automatically. It focuses on structural and type-compatible mapping.
 
 ## Design Goals
 
@@ -462,6 +538,7 @@ Automapper is designed around a few principles:
 - **Composable codecs** — structs, arrays, slices, and maps recursively reuse codecs.
 - **Explicit customization** — custom codecs handle transformations that cannot be inferred safely.
 - **Use Go's type system** — assignability and convertibility follow Go reflection semantics.
+- **Keep configuration predictable** — custom codec configuration uses atomic replace-all semantics.
 
 ## Requirements
 
