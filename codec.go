@@ -5,15 +5,16 @@ import (
 )
 
 type (
-	CodecFn func(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error
+	Codec        func(sourceValue RValue, targetValue RValue) error
+	CodecFactory func(sourceField RType, targetField RType) Codec
 )
 
 var (
-	codecs []CodecFn
+	codecs []CodecFactory
 )
 
 func init() {
-	codecs = []CodecFn{
+	codecs = []CodecFactory{
 		AssignCodec,
 		ConvertCodec,
 		StructCodec,
@@ -22,7 +23,7 @@ func init() {
 	}
 }
 
-func AssignCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
+func AssignCodec(sourceField RType, targetField RType) Codec {
 	if !sourceField.AssignableTo(targetField) {
 		return nil
 	}
@@ -33,7 +34,7 @@ func AssignCodec(sourceField RType, targetField RType) func(sourceValue RValue, 
 	}
 }
 
-func ConvertCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
+func ConvertCodec(sourceField RType, targetField RType) Codec {
 	if !sourceField.ConvertibleTo(targetField) {
 		return nil
 	}
@@ -44,12 +45,12 @@ func ConvertCodec(sourceField RType, targetField RType) func(sourceValue RValue,
 	}
 }
 
-func StructCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
+func StructCodec(sourceField RType, targetField RType) Codec {
 	if sourceField.Kind() != reflect.Struct || targetField.Kind() != reflect.Struct {
 		return nil
 	}
 
-	out := make([]func(sourceValue RValue, targetValue RValue) error, 0)
+	out := make([]Codec, 0)
 
 	for i := range sourceField.NumField() {
 		f := sourceField.Field(i)
@@ -57,7 +58,7 @@ func StructCodec(sourceField RType, targetField RType) func(sourceValue RValue, 
 		if !ok {
 			continue
 		}
-		codec := Codec(typeOf(f.Type).ConcreteType(), typeOf(target.Type).ConcreteType())
+		codec := CreateCodec(typeOf(f.Type).ConcreteType(), typeOf(target.Type).ConcreteType())
 
 		if codec == nil {
 			continue
@@ -84,14 +85,14 @@ func StructCodec(sourceField RType, targetField RType) func(sourceValue RValue, 
 	}
 }
 
-func ArrayCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
+func ArrayCodec(sourceField RType, targetField RType) Codec {
 	if (sourceField.Kind() != reflect.Slice && sourceField.Kind() != reflect.Array) || (targetField.Kind() != reflect.Slice && targetField.Kind() != reflect.Array) {
 		return nil
 	}
 
 	targetElem := typeOf(targetField.Elem())
 	targetType := targetElem.ConcreteType()
-	codec := Codec(typeOf(sourceField.Elem()).ConcreteType(), targetType)
+	codec := CreateCodec(typeOf(sourceField.Elem()).ConcreteType(), targetType)
 	if codec == nil {
 		return nil
 	}
@@ -117,7 +118,7 @@ func ArrayCodec(sourceField RType, targetField RType) func(sourceValue RValue, t
 	}
 }
 
-func MapCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
+func MapCodec(sourceField RType, targetField RType) Codec {
 	if sourceField.Kind() != reflect.Map || targetField.Kind() != reflect.Map {
 		return nil
 	}
@@ -134,11 +135,11 @@ func MapCodec(sourceField RType, targetField RType) func(sourceValue RValue, tar
 	keyN := targetKeyRawType.PointerCount()
 	valueN := targetValueRawType.PointerCount()
 
-	keyCodec := Codec(sourceKeyRawType.ConcreteType(), keyType.ConcreteType())
+	keyCodec := CreateCodec(sourceKeyRawType.ConcreteType(), keyType.ConcreteType())
 	if keyCodec == nil {
 		return nil
 	}
-	valueCodec := Codec(sourceValueRawType.ConcreteType(), valueType.ConcreteType())
+	valueCodec := CreateCodec(sourceValueRawType.ConcreteType(), valueType.ConcreteType())
 	if valueCodec == nil {
 		return nil
 	}
@@ -162,7 +163,7 @@ func MapCodec(sourceField RType, targetField RType) func(sourceValue RValue, tar
 	}
 }
 
-func Codec(src RType, target RType) func(sourceValue RValue, targetValue RValue) error {
+func CreateCodec(src RType, target RType) func(sourceValue RValue, targetValue RValue) error {
 	for _, p := range codecs {
 		if fn := p(src, target); fn != nil {
 			return fn
@@ -171,11 +172,11 @@ func Codec(src RType, target RType) func(sourceValue RValue, targetValue RValue)
 	return nil
 }
 
-func CodecFor[T any, R any]() func(in *T) (*R, error) {
+func CreateCodecFor[T any, R any]() func(in *T) (*R, error) {
 	src := TypeFor[T]()
 	target := TypeFor[R]()
 
-	fn := Codec(src.ConcreteType(), target.ConcreteType())
+	fn := CreateCodec(src.ConcreteType(), target.ConcreteType())
 	if fn == nil {
 		return nil
 	}
