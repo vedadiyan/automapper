@@ -22,18 +22,6 @@ func init() {
 	}
 }
 
-func FastConvertCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
-	outType := targetField.ConcreteType()
-	return func(sourceValue RValue, targetValue RValue) error {
-		if sourceValue.Kind() != reflect.Pointer {
-			sourceValue = sourceValue.Reference(1)
-		}
-		out := NewAt(outType, sourceValue.ConcreteValue().Reference(1).UnsafePointer())
-		targetValue.SetAt(out.ConcreteValue(), targetValue.ptrCount)
-		return nil
-	}
-}
-
 func AssignCodec(sourceField RType, targetField RType) func(sourceValue RValue, targetValue RValue) error {
 	if !sourceField.AssignableTo(targetField) {
 		return nil
@@ -74,8 +62,10 @@ func StructCodec(sourceField RType, targetField RType) func(sourceValue RValue, 
 		if codec == nil {
 			continue
 		}
+		sourceIndex := i
+		targetIndex := target.Index
 		out = append(out, func(sourceValue RValue, targetValue RValue) error {
-			err := codec(valueOf(sourceValue.Field(i)), valueOf(targetValue.FieldByName(f.Name)))
+			err := codec(valueOf(sourceValue.Field(sourceIndex)), valueOf(targetValue.FieldByIndex(targetIndex)))
 			if err != nil {
 				return err
 			}
