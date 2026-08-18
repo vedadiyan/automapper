@@ -43,6 +43,37 @@ func (rt RType) PointerCount() int {
 	return rt.ptrCount
 }
 
+func (rt RType) DetectCycleLoop() bool {
+	visited := make(map[reflect.Type]bool)
+
+	var detect func(RType) bool
+	detect = func(current RType) bool {
+		current = current.ConcreteType()
+
+		if visited[current.Type] {
+			return true
+		}
+
+		visited[current.Type] = true
+		defer delete(visited, current.Type)
+
+		switch current.Kind() {
+		case reflect.Struct:
+			for i := 0; i < current.NumField(); i++ {
+				if detect(typeOf(current.Field(i).Type)) {
+					return true
+				}
+			}
+		case reflect.Array, reflect.Slice, reflect.Map:
+			return detect(typeOf(current.Elem()))
+		}
+
+		return false
+	}
+
+	return detect(rt)
+}
+
 func DeReferenceType(v reflect.Type) (int, reflect.Type) {
 	i := 0
 	for ; v.Kind() == reflect.Pointer; i++ {

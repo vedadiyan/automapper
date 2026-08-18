@@ -1,6 +1,7 @@
 package automapper
 
 import (
+	"fmt"
 	"reflect"
 	"sync/atomic"
 )
@@ -199,6 +200,12 @@ func CreateCodecFor[T any, R any]() func(in *T) (*R, error) {
 	src := TypeFor[T]()
 	target := TypeFor[R]()
 
+	if target.DetectCycleLoop() {
+		return func(in *T) (*R, error) {
+			return nil, fmt.Errorf("cycle loop detected")
+		}
+	}
+
 	fn := CreateCodec(src.ConcreteType(), target.ConcreteType())
 	if fn == nil {
 		return nil
@@ -215,6 +222,14 @@ func CreateCodecFor[T any, R any]() func(in *T) (*R, error) {
 func CreateCustomCodec[T any, R any](codec func(RValue) (RValue, error)) CodecFactory {
 	src := TypeFor[T]()
 	tgt := TypeFor[R]()
+	if tgt.DetectCycleLoop() {
+		return func(sourceField, targetField RType) Codec {
+			return func(sourceValue, targetValue RValue) error {
+				return fmt.Errorf("cycle loop detected")
+			}
+		}
+	}
+
 	return func(sourceField RType, targetField RType) Codec {
 		if sourceField.ConcreteType() != src.ConcreteType() || targetField.ConcreteType() != tgt.ConcreteType() {
 			return nil
