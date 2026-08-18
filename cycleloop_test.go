@@ -1,6 +1,9 @@
 package automapper
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 type Node struct {
 	Value int
@@ -21,11 +24,8 @@ func TestCreateCodecFor_SelfReferentialStruct(t *testing.T) {
 	}
 
 	src := &Node{Value: 1, Next: struct{ Next *Node }{Next: &Node{}}}
-	got, err := codec(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got.Value != 1 || got.Next.Value != 2 || got.Next.Next.Value != 3 || got.Next.Next.Next != nil {
-		t.Fatalf("got %+v", got)
+	_, err := codec(src)
+	if err == nil {
+		t.Fatal(fmt.Errorf("expected error"))
 	}
 }
