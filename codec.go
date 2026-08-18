@@ -102,6 +102,9 @@ func ArrayCodec(sourceField RType, targetField RType) func(sourceValue RValue, t
 	targetElem := typeOf(targetField.Elem())
 	targetType := targetElem.ConcreteType()
 	codec := Codec(typeOf(sourceField.Elem()).ConcreteType(), targetType)
+	if codec == nil {
+		return nil
+	}
 	n := targetElem.PointerCount()
 
 	return func(sourceValue, targetValue RValue) error {
@@ -142,7 +145,13 @@ func MapCodec(sourceField RType, targetField RType) func(sourceValue RValue, tar
 	valueN := targetValueRawType.PointerCount()
 
 	keyCodec := Codec(sourceKeyRawType.ConcreteType(), keyType.ConcreteType())
+	if keyCodec == nil {
+		return nil
+	}
 	valueCodec := Codec(sourceValueRawType.ConcreteType(), valueType.ConcreteType())
+	if valueCodec == nil {
+		return nil
+	}
 
 	return func(sourceValue, targetValue RValue) error {
 		mapRange := sourceValue.MapRange()
