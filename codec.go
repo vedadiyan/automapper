@@ -67,7 +67,11 @@ func StructCodec(sourceField RType, targetField RType) Codec {
 
 	for i := range sourceField.NumField() {
 		f := sourceField.Field(i)
-		target, ok := targetField.FieldByName(f.Name)
+		tag, ignore := parseTag(f.Name, f.Tag.Get("mapper"))
+		if ignore {
+			continue
+		}
+		target, ok := targetField.FieldByName(tag)
 		if !ok {
 			continue
 		}
@@ -219,4 +223,14 @@ func CreateCustomCodec[T any, R any](codec func(RValue) (RValue, error)) CodecFa
 func SetCustomCodecs(codecs []CodecFactory) {
 	copied := append([]CodecFactory(nil), codecs...)
 	customCodecs.Store(&copied)
+}
+
+func parseTag(fieldName, value string) (string, bool) {
+	if value == "-" {
+		return "", true
+	}
+	if value == "" {
+		return fieldName, false
+	}
+	return value, false
 }

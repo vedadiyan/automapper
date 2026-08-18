@@ -7,15 +7,20 @@ Automapper maps values between different Go types using pre-built codecs. It sup
 ## Features
 
 - Fast runtime mapping
+- Codec-based architecture
 - Automatic struct field mapping by field name
+- Nested struct mapping
+- Assignable type support
 - Convertible type support
 - Slice and array mapping
-- Map mapping
+- Map key and value mapping
 - Pointer-aware mapping
 - Custom codecs
-- Concurrency-safe custom codec configuration
+- Atomic, concurrency-safe custom codec configuration
 - Generic API
 - Codec creation separated from value mapping
+- Reusable codecs for repeated mappings
+- No runtime locking for custom codec reads
 
 ## Installation
 
@@ -61,30 +66,31 @@ func main() {
 }
 ~~~
 
+`CreateCodecFor` performs type analysis once and returns a reusable mapping function.
+
 ## How It Works
 
-Automapper builds a `Codec` from the source and target types.
+Automapper separates codec creation from value mapping.
+
+A codec has the following form:
 
 ~~~go
 type Codec func(sourceValue RValue, targetValue RValue) error
 ~~~
 
-A codec is created once and can then be reused:
+Codec factories determine whether they can handle a particular source/target type pair:
 
 ~~~go
-codec := mapper.CreateCodecFor[User, UserDTO]()
-
-for _, user := range users {
-	dto, err := codec(&user)
-	if err != nil {
-		return err
-	}
-
-	// use dto
-}
+type CodecFactory func(sourceField RType, targetField RType) Codec
 ~~~
 
-The mapper resolves codecs in this order:
+When a codec is created, Automapper recursively builds the codecs required for nested fields, collections, and maps.
+
+The resulting codec can then be reused without repeating codec discovery.
+
+### Codec Resolution Order
+
+Codecs are checked in this order:
 
 1. Custom codec
 2. Assignable type
@@ -93,9 +99,11 @@ The mapper resolves codecs in this order:
 5. Array / slice
 6. Map
 
+The first matching codec is used.
+
 ## Struct Mapping
 
-Fields are matched by name.
+Struct fields are matched by name.
 
 ~~~go
 type Source struct {
@@ -110,13 +118,43 @@ type Target struct {
 }
 ~~~
 
-`Email` is ignored because the target does not contain a matching field.
+`ID` and `Name` are mapped automatically.
 
-Nested structs are handled automatically.
+`Email` is ignored because the target has no matching field.
+
+Nested structs are handled recursively.
+
+~~~go
+type Source struct {
+	User User
+}
+
+type Target struct {
+	User UserDTO
+}
+~~~
+
+## Type Conversion
+
+Assignable and convertible Go types are handled automatically.
+
+For example:
+
+~~~go
+type Source struct {
+	ID int
+}
+
+type Target struct {
+	ID int64
+}
+~~~
+
+If the source type is convertible to the target type, Automapper uses Go's `reflect.Value.Convert`.
 
 ## Slices and Arrays
 
-Slices and arrays are supported when their element types can be mapped.
+Slices and arrays are mapped recursively when their element types are compatible.
 
 ~~~go
 type Source struct {
@@ -130,9 +168,16 @@ type Target struct {
 
 The element codec is created once and reused for every element.
 
+The following combinations are supported:
+
+- Slice → Slice
+- Array → Array
+- Slice → Array
+- Array → Slice
+
 ## Maps
 
-Maps are mapped recursively, including their keys and values.
+Maps are mapped recursively, including both keys and values.
 
 ~~~go
 type Source struct {
@@ -148,7 +193,7 @@ Both the key and value types must have a compatible codec.
 
 ## Pointer Support
 
-Pointer levels are handled automatically.
+Pointer levels are tracked automatically.
 
 ~~~go
 type Source struct {
@@ -160,9 +205,13 @@ type Target struct {
 }
 ~~~
 
+Automapper handles the required pointer levels when assigning mapped values.
+
 ## Custom Codecs
 
-For cases where automatic mapping is not sufficient, create a custom codec:
+Use a custom codec when automatic mapping is not sufficient.
+
+Create one with `CreateCustomCodec`:
 
 ~~~go
 custom := mapper.CreateCustomCodec[User, UserDTO](
@@ -185,22 +234,64 @@ mapper.SetCustomCodecs([]mapper.CodecFactory{
 })
 ~~~
 
-Custom codecs take precedence over the built-in codecs.
+Custom codecs take precedence over all built-in codecs.
 
-### Replacing Custom Codecs
+### Why `RValue`?
 
-`SetCustomCodecs` replaces the complete custom-codec set.
+The custom codec receives an `RValue` instead of `*T`.
+
+This keeps the custom-codec path inside Automapper's reflection/value abstraction and avoids converting the value into an intermediate Go value solely for the callback.
+
+For example:
+
+~~~go
+func(value mapper.RValue) (mapper.RValue, error) {
+	user := value.ConcreteValue().Interface().(User)
+
+	return mapper.ValueOf(UserDTO{
+		ID:   user.ID,
+		Name: user.Name,
+	}), nil
+}
+~~~
+
+## Custom Codec Configuration
+
+Custom codecs are configured as a complete set:
 
 ~~~go
 mapper.SetCustomCodecs([]mapper.CodecFactory{
 	codec1,
 	codec2,
+	codec3,
 })
 ~~~
 
-The supplied slice is copied before being published.
+Calling `SetCustomCodecs` replaces the previous configuration.
 
-The configuration is published atomically, so replacing custom codecs is safe while mappings are running concurrently.
+The supplied slice is copied before being published, so later modifications to the caller's slice do not affect Automapper.
+
+### Concurrency
+
+Custom codec configuration uses `atomic.Pointer` rather than a mutex.
+
+Reads therefore require no locking:
+
+~~~go
+func CustomCodec(sourceField RType, targetField RType) Codec {
+	for _, codec := range *customCodecs.Load() {
+		if fn := codec(sourceField, targetField); fn != nil {
+			return fn
+		}
+	}
+
+	return nil
+}
+~~~
+
+Replacing the custom codec configuration is atomic, making concurrent codec creation and mapping safe.
+
+`SetCustomCodecs` uses replace-all semantics rather than add/remove semantics.
 
 ## Reusing a Codec
 
@@ -221,15 +312,36 @@ for i := range sources {
 
 This avoids repeatedly performing codec discovery for the same source/target pair.
 
+For high-throughput workloads, this is the recommended usage pattern.
+
+## Direct Codec Creation
+
+Automapper also exposes the lower-level API:
+
+~~~go
+codec := mapper.CreateCodec(
+	mapper.TypeFor[Source]().ConcreteType(),
+	mapper.TypeFor[Target]().ConcreteType(),
+)
+~~~
+
+This is useful when working directly with `RType` and `RValue`.
+
+For normal generic usage, prefer:
+
+~~~go
+mapper.CreateCodecFor[Source, Target]()
+~~~
+
 ## Performance
 
 Example benchmark results on an AMD EPYC 7763:
 
 ~~~text
-BenchmarkAutomapper_Struct-2          1434258    825.6 ns/op     80 B/op     3 allocs/op
-BenchmarkAutomapper_NestedStruct-2   1000000   1091   ns/op    104 B/op     4 allocs/op
-BenchmarkAutomapper_Slice-2           663115   1945   ns/op    216 B/op    14 allocs/op
-BenchmarkAutomapper_Map-2             515337   2413   ns/op    448 B/op    20 allocs/op
+BenchmarkAutomapper_Struct-2             1434258    825.6 ns/op     80 B/op     3 allocs/op
+BenchmarkAutomapper_NestedStruct-2       1000000   1091   ns/op    104 B/op     4 allocs/op
+BenchmarkAutomapper_Slice-2               663115   1945   ns/op    216 B/op    14 allocs/op
+BenchmarkAutomapper_Map-2                 515337   2413   ns/op    448 B/op    20 allocs/op
 ~~~
 
 Compared with the benchmarked `copier` implementation:
@@ -243,58 +355,84 @@ Slice                     1945 ns/op      2675 ns/op
 Map                       2413 ns/op      3770 ns/op
 ~~~
 
-Benchmarks are workload-dependent. Benchmark your own types and mapping patterns before making performance assumptions.
+These benchmarks are workload-dependent. Actual performance depends on the structures being mapped, nesting depth, collection sizes, pointer levels, and custom codecs.
 
-## Design
+Benchmark your own workload before making performance assumptions.
 
-Automapper separates type inspection from value mapping.
+## Architecture
+
+Automapper has three main concepts.
 
 ~~~text
-Source/Target Types
-        │
-        ▼
-   CodecFactory
-        │
-        ▼
-      Codec
-        │
-        ▼
-Source Value ──────► Target Value
+                 Source / Target Types
+                          │
+                          ▼
+                    CodecFactory
+                          │
+                          ▼
+                        Codec
+                          │
+                          ▼
+                 Source RValue
+                          │
+                          ▼
+                 Target RValue
 ~~~
 
-A `CodecFactory` determines whether it can handle a source/target type pair.
+### `RType`
 
-~~~go
-type CodecFactory func(
-	sourceField RType,
-	targetField RType,
-) Codec
-~~~
+`RType` wraps `reflect.Type` and caches information used repeatedly during mapping:
 
-Once created, the resulting `Codec` performs the actual mapping.
+- Original Go type
+- Concrete/non-pointer type
+- Pointer count
 
-This means type analysis happens during codec creation rather than repeatedly during every field mapping operation.
+### `RValue`
+
+`RValue` wraps `reflect.Value` and similarly tracks:
+
+- Original value
+- Concrete value
+- Pointer count
+
+This keeps pointer handling and reflection operations centralized rather than duplicating them throughout every codec.
+
+### Codec Factory
+
+A `CodecFactory` answers one question:
+
+> Can this factory map this source type to this target type?
+
+If yes, it returns a `Codec`.
+
+If not, it returns `nil`.
+
+This makes adding new mapping strategies straightforward.
 
 ## Supported Mapping Rules
 
 | Source | Target | Support |
 |---|---|---|
-| Assignable types | Same/compatible type | Yes |
-| Convertible types | Convertible type | Yes |
+| Assignable type | Compatible type | Yes |
+| Convertible type | Convertible type | Yes |
 | Struct | Struct | Yes |
 | Slice | Slice | Yes |
 | Array | Array | Yes |
 | Slice | Array | Yes |
 | Array | Slice | Yes |
 | Map | Map | Yes |
-| Pointer types | Pointer types | Yes |
-| Custom codec | Explicitly registered pair | Yes |
+| Pointer | Pointer | Yes |
+| Custom codec | Registered pair | Yes |
+| Nested structs | Nested structs | Yes |
+| Nested collections | Nested collections | Yes |
+| Map keys | Mappable keys | Yes |
+| Map values | Mappable values | Yes |
 
 ## Limitations
 
-Automapper uses field names for automatic struct mapping.
+Automapper matches struct fields by name.
 
-It does not guess semantic relationships between differently named fields.
+It does not infer semantic relationships between differently named fields.
 
 For example:
 
@@ -311,6 +449,19 @@ type Target struct {
 `UserID` will not automatically map to `ID`.
 
 Use a custom codec when explicit transformation logic is required.
+
+Automapper also does not attempt to perform arbitrary business-logic transformations automatically. It focuses on structural and type-compatible mapping.
+
+## Design Goals
+
+Automapper is designed around a few principles:
+
+- **Build once, execute many times** — type analysis happens when the codec is created.
+- **Keep the hot path small** — mapping uses already-created codecs.
+- **Avoid unnecessary synchronization** — custom codec reads use atomic publication rather than locks.
+- **Composable codecs** — structs, arrays, slices, and maps recursively reuse codecs.
+- **Explicit customization** — custom codecs handle transformations that cannot be inferred safely.
+- **Use Go's type system** — assignability and convertibility follow Go reflection semantics.
 
 ## Requirements
 
