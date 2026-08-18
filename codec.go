@@ -130,7 +130,7 @@ func ArrayCodec(sourceField RType, targetField RType) Codec {
 		}
 		target := valueOf(reflect.New(targetType.GoType()).Elem())
 		targetValue = targetValue.Refresh().ConcreteValue()
-		for i := range sourceValue.Len() {
+		for i := range min(sourceValue.Len(), targetValue.Len()) {
 			src := valueOf(sourceValue.Index(i))
 			err := codec(src, target)
 			if err != nil {
