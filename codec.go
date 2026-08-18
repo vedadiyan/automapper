@@ -10,17 +10,28 @@ type (
 )
 
 var (
-	codecs []CodecFactory
+	codecs       []CodecFactory
+	customCodecs []CodecFactory
 )
 
 func init() {
 	codecs = []CodecFactory{
+		CustomCodec,
 		AssignCodec,
 		ConvertCodec,
 		StructCodec,
 		ArrayCodec,
 		MapCodec,
 	}
+}
+
+func CustomCodec(sourceField RType, targetField RType) Codec {
+	for _, codec := range customCodecs {
+		if fn := codec(sourceField, targetField); fn != nil {
+			return fn
+		}
+	}
+	return nil
 }
 
 func AssignCodec(sourceField RType, targetField RType) Codec {
@@ -163,7 +174,7 @@ func MapCodec(sourceField RType, targetField RType) Codec {
 	}
 }
 
-func CreateCodec(src RType, target RType) func(sourceValue RValue, targetValue RValue) error {
+func CreateCodec(src RType, target RType) Codec {
 	for _, p := range codecs {
 		if fn := p(src, target); fn != nil {
 			return fn
@@ -187,4 +198,23 @@ func CreateCodecFor[T any, R any]() func(in *T) (*R, error) {
 		}
 		return targetValue.Reference(target.PointerCount()).Interface().(*R), nil
 	}
+}
+
+func AddCustomCodec[T any, R any](codec func(RValue) (RValue, error)) {
+	src := TypeFor[T]()
+	tgt := TypeFor[R]()
+	fn := func(sourceField RType, targetField RType) Codec {
+		if sourceField.ConcreteType() != src.ConcreteType() || targetField.ConcreteType() != tgt.ConcreteType() {
+			return nil
+		}
+		return func(sourceValue RValue, targetValue RValue) error {
+			r, err := codec(sourceValue)
+			if err != nil {
+				return err
+			}
+			targetValue.SetAt(r.ConcreteValue(), targetField.PointerCount())
+			return nil
+		}
+	}
+	customCodecs = append(customCodecs, fn)
 }
