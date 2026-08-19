@@ -83,7 +83,7 @@ type Codec func(sourceValue RValue, targetValue RValue) error
 Codec factories determine whether they can handle a particular source/target type pair:
 
 ~~~go
-type CodecFactory func(sourceField RType, targetField RType) Codec
+type CodecFactory func(sourceType RType, targetType RType) Codec
 ~~~
 
 When a codec is created, Automapper recursively builds the codecs required for nested fields, collections, and maps.
@@ -343,9 +343,9 @@ Custom codec configuration uses `atomic.Pointer` rather than a mutex.
 Reads therefore require no locking:
 
 ~~~go
-func CustomCodec(sourceField RType, targetField RType) Codec {
+func CustomCodec(sourceType RType, targetType RType) Codec {
 	for _, codec := range *customCodecs.Load() {
-		if fn := codec(sourceField, targetField); fn != nil {
+		if fn := codec(sourceType, targetType); fn != nil {
 			return fn
 		}
 	}
