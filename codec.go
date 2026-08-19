@@ -250,12 +250,3 @@ func SetCustomCodecs(codecs []CodecFactory) {
 	customCodecs.Store(&copied)
 }
 
-func parseTag(fieldName, value string) (string, bool) {
-	if value == "-" {
-		return "", true
-	}
-	if value == "" {
-		return fieldName, false
-	}
-	return value, false
-}

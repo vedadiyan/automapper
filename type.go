@@ -60,7 +60,11 @@ func (rt RType) DetectCycleLoop() bool {
 		switch current.Kind() {
 		case reflect.Struct:
 			for i := 0; i < current.NumField(); i++ {
-				if detect(typeOf(current.Field(i).Type)) {
+				f := current.Field(i)
+				if _, ignore := parseTag(f.Name, f.Tag.Get("mapper")); ignore {
+					continue
+				}
+				if detect(typeOf(f.Type)) {
 					return true
 				}
 			}
@@ -80,4 +84,14 @@ func DeReferenceType(v reflect.Type) (int, reflect.Type) {
 		v = v.Elem()
 	}
 	return i, v
+}
+
+func parseTag(fieldName, value string) (string, bool) {
+	if value == "-" {
+		return "", true
+	}
+	if value == "" {
+		return fieldName, false
+	}
+	return value, false
 }
